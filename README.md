@@ -11,7 +11,7 @@ Small Local Language Models (SLMs) running on edge hardware frequently struggle 
 
 **Inferencedevs Constrained Engine (ICE)** eliminates these failures by sitting directly inside the PyTorch generation loop at every single token step. Using a mathematical finite state machine and subword prefix indexing, ICE calculates which vocabulary tokens are structurally legal according to a target JSON schema and applies an additive logit mask ($-\infty$) to block illegal choices. 
 
-**ICE forces small local models (like Qwen2.5-0.5B on CPU) to generate 100% syntactically valid structured data on the first pass, with zero external network dependencies.**
+**ICE forces small local models (like Qwen2.5-0.5B on CPU) to generate structurally valid outputs within the supported grammar subset, with zero external network dependencies.**
 
 ---
 
