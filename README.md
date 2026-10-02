@@ -30,7 +30,7 @@ Given an autoregressive token history $t_{<i} = (t_1, t_2, \dots, t_{i-1})$ and 
    $$M(S_i)_v = \begin{cases} 0 & \text{if } v \in A(S_i) \\ -\infty & \text{if } v \notin A(S_i) \end{cases}$$
    $$\mathbf{z}'_i = \mathbf{z}_i + \mathbf{M}(S_i)$$
 
-4. **Constrained Softmax Sampling:**
+5. **Constrained Softmax Sampling:**
    $$P_{\text{ICE}}(t_i = v \mid t_{<i}, S_i) = \frac{\exp(z'_{i, v})}{\sum_{k \in A(S_i)} \exp(z'_{i, k})}$$
 
 ---
