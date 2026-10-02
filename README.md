@@ -73,6 +73,7 @@ inferencedevs-ice/
 ├── main.py                    # Terminal execution entrypoint
 ├── requirements.txt
 └── README.md
+```
 
 
 ## 🗺️ Project Phases & Implementation Roadmap
@@ -127,7 +128,7 @@ source venv/bin/activate  # On Windows: venv\Scripts\activate
 
 # Install dependencies
 pip install -r requirements.txt
-
+```
 
 
 ### 2. Daily Workflow & Pushing Code
@@ -148,3 +149,4 @@ git commit -m "feat: implement Phase X <module_name>"
 
 # Push to repository
 git push origin main
+```
