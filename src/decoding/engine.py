@@ -1,4 +1,4 @@
-"""Incremental Phase 3 decoding engine."""
+"""Incremental ICE decoding engine with Phase 4 diagnostics."""
 
 from __future__ import annotations
 
@@ -19,11 +19,13 @@ class ICEDecodingEngine:
     def __init__(self, model, tokenizer, compatibility_engine=None):
         self.model = model
         self.tokenizer = tokenizer
+
         self.compatibility_engine = (
             compatibility_engine
             if compatibility_engine is not None
             else CompatibilityEngine(tokenizer)
         )
+
         self.processor = ICELogitsProcessor(
             self.compatibility_engine
         )
@@ -47,12 +49,22 @@ class ICEDecodingEngine:
         input_ids = inputs["input_ids"]
         attention_mask = inputs.get("attention_mask")
 
-        # Phase 3 starts from the beginning of the JSON object.
+        # Start from the beginning of the JSON object.
         state = State(
             GrammarState.EXPECT_OBJECT_START
         )
 
         generated_ids = []
+
+        # ---------------------------------------------------------
+        # Phase 4 diagnostics
+        # ---------------------------------------------------------
+
+        vocabulary_size = len(self.tokenizer)
+
+        valid_token_counts = []
+        masked_token_counts = []
+        masking_ratios = []
 
         start_time = time.perf_counter()
 
@@ -72,7 +84,48 @@ class ICEDecodingEngine:
                 # Give ICE the current grammar state.
                 self.processor.set_state(state)
 
+                # -------------------------------------------------
+                # Phase 4: collect valid-token statistics.
+                # -------------------------------------------------
+
+                valid_token_ids = (
+                    self.compatibility_engine.get_valid_tokens(
+                        state
+                    )
+                )
+
+                valid_count = len(
+                    valid_token_ids
+                )
+
+                masked_count = (
+                    vocabulary_size
+                    - valid_count
+                )
+
+                masking_ratio = (
+                    masked_count
+                    / vocabulary_size
+                    if vocabulary_size
+                    else 0.0
+                )
+
+                valid_token_counts.append(
+                    valid_count
+                )
+
+                masked_token_counts.append(
+                    masked_count
+                )
+
+                masking_ratios.append(
+                    masking_ratio
+                )
+
+                # -------------------------------------------------
                 # Apply the actual ICE logit mask.
+                # -------------------------------------------------
+
                 masked_logits = self.processor(
                     input_ids,
                     outputs.logits[:, -1, :],
@@ -98,7 +151,7 @@ class ICEDecodingEngine:
                         f"Token {token_id} decoded to empty text."
                     )
 
-                # Advance grammar state using the actual token text.
+                # Advance grammar state using actual token text.
                 next_state = state
 
                 for char in token_text:
@@ -123,7 +176,7 @@ class ICEDecodingEngine:
 
                 state = next_state
 
-                # The JSON object is complete.
+                # JSON object is complete.
                 if (
                     state.grammar_state
                     == GrammarState.DONE
@@ -131,7 +184,7 @@ class ICEDecodingEngine:
                     break
 
                 # Feed only the newly generated token on
-                # subsequent passes, using the KV cache.
+                # subsequent passes using the KV cache.
                 input_ids = next_token.unsqueeze(0)
 
                 if attention_mask is not None:
@@ -176,10 +229,37 @@ class ICEDecodingEngine:
             generated_ids
         )
 
+        # ---------------------------------------------------------
+        # Phase 4 summary statistics
+        # ---------------------------------------------------------
+
+        average_valid_tokens = (
+            sum(valid_token_counts)
+            / len(valid_token_counts)
+            if valid_token_counts
+            else 0.0
+        )
+
+        average_masked_tokens = (
+            sum(masked_token_counts)
+            / len(masked_token_counts)
+            if masked_token_counts
+            else 0.0
+        )
+
+        average_masking_ratio = (
+            sum(masking_ratios)
+            / len(masking_ratios)
+            if masking_ratios
+            else 0.0
+        )
+
         return {
             "text": generated_text,
             "generated_tokens": generated_tokens,
+
             "elapsed_seconds": elapsed,
+
             "ms_per_token": (
                 elapsed
                 / generated_tokens
@@ -187,5 +267,36 @@ class ICEDecodingEngine:
                 if generated_tokens
                 else 0.0
             ),
+
             "final_state": state,
+
+            # Phase 4 diagnostics
+            "vocabulary_size": vocabulary_size,
+            "valid_token_counts": valid_token_counts,
+            "masked_token_counts": masked_token_counts,
+            "masking_ratios": masking_ratios,
+
+            "average_valid_tokens": (
+                average_valid_tokens
+            ),
+
+            "average_masked_tokens": (
+                average_masked_tokens
+            ),
+
+            "average_masking_ratio": (
+                average_masking_ratio
+            ),
+
+            "minimum_valid_tokens": (
+                min(valid_token_counts)
+                if valid_token_counts
+                else 0
+            ),
+
+            "maximum_valid_tokens": (
+                max(valid_token_counts)
+                if valid_token_counts
+                else 0
+            ),
         }

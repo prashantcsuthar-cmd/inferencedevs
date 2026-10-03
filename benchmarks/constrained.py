@@ -1,223 +1,291 @@
-import torch
+"""Phase 3 - ICE constrained benchmark."""
 
-from transformers import AutoTokenizer, AutoModelForCausalLM
+from __future__ import annotations
 
-from src.schema.states import State, GrammarState
-from src.schema.grammar import transition
-from src.tokenizer.compatibility import CompatibilityEngine
+import json
+import sys
+from pathlib import Path
 
 
-def generate_constrained(
-    model,
-    tokenizer,
-    prompt: str,
-    max_new_tokens: int = 128,
-):
-    """
-    Phase 3 constrained generation.
+PROJECT_ROOT = (
+    Path(__file__).resolve().parent.parent
+)
 
-    The grammar state is explicitly maintained by the decoding loop.
-    This avoids relying on transformers.generate() to manage ICE state.
-    """
-
-    # ---------------------------------------------------------
-    # 1. Create compatibility engine
-    # ---------------------------------------------------------
-
-    compatibility_engine = CompatibilityEngine(tokenizer)
-
-    # ---------------------------------------------------------
-    # 2. Start grammar
-    # ---------------------------------------------------------
-
-    state = State(
-        grammar_state=GrammarState.EXPECT_OBJECT_START,
-        buffer=""
-    )
-
-    # ---------------------------------------------------------
-    # 3. Tokenize prompt
-    # ---------------------------------------------------------
-
-    inputs = tokenizer(
-        prompt,
-        return_tensors="pt"
-    ).to(model.device)
-
-    input_ids = inputs["input_ids"]
-
-    # Keep attention mask if tokenizer provides one.
-    attention_mask = inputs.get("attention_mask")
-
-    # ---------------------------------------------------------
-    # 4. Explicit constrained decoding loop
-    # ---------------------------------------------------------
-
-    model.eval()
-
-    with torch.no_grad():
-
-        for step in range(max_new_tokens):
-
-            # Run the model.
-            outputs = model(
-                input_ids=input_ids,
-                attention_mask=attention_mask,
-            )
-
-            # Logits for the next token.
-            logits = outputs.logits[:, -1, :]
-
-            # -------------------------------------------------
-            # Get grammar-valid tokens
-            # -------------------------------------------------
-
-            valid_token_ids = (
-                compatibility_engine
-                .get_valid_tokens(state)
-            )
-
-            if not valid_token_ids:
-                raise RuntimeError(
-                    "Grammar produced no valid tokens at "
-                    f"generation step {step}. "
-                    f"Current state: {state}"
-                )
-
-            # -------------------------------------------------
-            # Mask invalid tokens
-            # -------------------------------------------------
-
-            masked_logits = torch.full_like(
-                logits,
-                float("-inf")
-            )
-
-            masked_logits[:, valid_token_ids] = (
-                logits[:, valid_token_ids]
-            )
-
-            # -------------------------------------------------
-            # Select highest-probability valid token
-            # -------------------------------------------------
-
-            next_token = torch.argmax(
-                masked_logits,
-                dim=-1
-            )
-
-            token_id = next_token.item()
-
-            # -------------------------------------------------
-            # Decode selected token
-            # -------------------------------------------------
-
-            token_text = tokenizer.decode(
-                [token_id],
-                skip_special_tokens=False
-            )
-
-            if token_text == "":
-                raise RuntimeError(
-                    f"Selected token {token_id} decoded to "
-                    "empty text."
-                )
-
-            # -------------------------------------------------
-            # Advance grammar state
-            # -------------------------------------------------
-
-            for char in token_text:
-                state = transition(
-                    state,
-                    char
-                )
-
-                if state.grammar_state == GrammarState.DEAD_END:
-                    raise RuntimeError(
-                        "Grammar entered DEAD_END after "
-                        f"token {token_id!r} "
-                        f"({token_text!r})."
-                    )
-
-            # -------------------------------------------------
-            # Append token to sequence
-            # -------------------------------------------------
-
-            next_token = next_token.unsqueeze(-1)
-
-            input_ids = torch.cat(
-                [input_ids, next_token],
-                dim=-1
-            )
-
-            if attention_mask is not None:
-                new_mask = torch.ones(
-                    (attention_mask.shape[0], 1),
-                    dtype=attention_mask.dtype,
-                    device=attention_mask.device,
-                )
-
-                attention_mask = torch.cat(
-                    [attention_mask, new_mask],
-                    dim=-1
-                )
-
-            # -------------------------------------------------
-            # Stop when grammar is complete
-            # -------------------------------------------------
-
-            if state.grammar_state == GrammarState.DONE:
-                break
-
-    # ---------------------------------------------------------
-    # 5. Decode final sequence
-    # ---------------------------------------------------------
-
-    return tokenizer.decode(
-        input_ids[0],
-        skip_special_tokens=True
+if str(PROJECT_ROOT) not in sys.path:
+    sys.path.insert(
+        0,
+        str(PROJECT_ROOT)
     )
 
 
-if __name__ == "__main__":
+from src.decoding.engine import (
+    ICEDecodingEngine
+)
+
+from src.models.loader import (
+    load_qwen
+)
+
+from src.schema.states import (
+    GrammarState
+)
+
+
+def check_json_validity(
+    text: str
+) -> bool:
+
+    try:
+
+        json.loads(text)
+
+        return True
+
+    except (
+        json.JSONDecodeError,
+        TypeError
+    ):
+
+        return False
+
+
+def run_constrained_benchmark():
 
     print("=" * 60)
     print("ICE PHASE 3 - CONSTRAINED BENCHMARK")
     print("=" * 60)
 
-    model_name = "Qwen/Qwen2.5-0.5B-Instruct"
+    print("\nLoading Qwen...")
 
-    print("\nLoading tokenizer...")
-    tokenizer = AutoTokenizer.from_pretrained(
-        model_name
+    model, tokenizer = load_qwen()
+
+    print("\nCreating ICE decoding engine...")
+
+    engine = ICEDecodingEngine(
+        model,
+        tokenizer
     )
 
-    print("Loading model...")
-    model = AutoModelForCausalLM.from_pretrained(
-        model_name
-    )
+    prompts = [
 
-    prompt = """Extract the following information as JSON:
-Customer Rahul Sharma placed order ORD12345.
+        """
+Extract the following information and return JSON only.
+
+Customer: Rahul Sharma
+Order ID: ORD12345
 Issue: Package was delivered late.
 
-Required fields:
-customer_name, order_id, issue.
-"""
+Required JSON fields:
+customer_name
+order_id
+issue
+""",
 
-    print("\nGenerating constrained output...\n")
+        """
+Extract the following information and return JSON only.
 
-    output = generate_constrained(
-        model=model,
-        tokenizer=tokenizer,
-        prompt=prompt,
-        max_new_tokens=128,
+Customer: Priya Kumar
+Order ID: ORD98765
+Issue: Product arrived damaged.
+
+Required JSON fields:
+customer_name
+order_id
+issue
+""",
+
+        """
+Extract the following information and return JSON only.
+
+Customer: Arjun Mehta
+Order ID: ORD54321
+Issue: Wrong item was delivered.
+
+Required JSON fields:
+customer_name
+order_id
+issue
+""",
+    ]
+
+    results = []
+
+    for index, prompt in enumerate(
+        prompts,
+        start=1
+    ):
+
+        print(
+            f"\n--- Example {index} ---"
+        )
+
+        result = engine.generate(
+            prompt,
+            max_new_tokens=128
+        )
+
+        result["json_valid"] = (
+            check_json_validity(
+                result["text"]
+            )
+        )
+
+        results.append(
+            result
+        )
+
+        print(
+            "\nGenerated output:"
+        )
+
+        print(
+            result["text"]
+        )
+
+        print(
+            f"\nGenerated tokens: "
+            f"{result['generated_tokens']}"
+        )
+
+        print(
+            f"Time: "
+            f"{result['elapsed_seconds']:.4f} seconds"
+        )
+
+        print(
+            f"Latency: "
+            f"{result['ms_per_token']:.2f} ms/token"
+        )
+
+        print(
+            f"Valid JSON: "
+            f"{result['json_valid']}"
+        )
+
+        print(
+            f"Final grammar state: "
+            f"{result['final_state'].grammar_state.name}"
+        )
+
+    valid_count = sum(
+        result["json_valid"]
+        for result in results
     )
 
-    print("Generated output:")
-    print(output)
+    done_count = sum(
+        result["final_state"].grammar_state
+        == GrammarState.DONE
+        for result in results
+    )
 
-    print("\n" + "=" * 60)
-    print("CONSTRAINED BENCHMARK COMPLETE")
-    print("=" * 60)
+    average_latency = (
+        sum(
+            result["ms_per_token"]
+            for result in results
+        )
+        / len(results)
+    )
+
+    average_valid_tokens = (
+    sum(
+        result["average_valid_tokens"]
+        for result in results
+    )
+    / len(results)
+    )
+
+    average_masked_tokens = (
+    sum(
+        result["average_masked_tokens"]
+        for result in results
+    )
+    / len(results)
+    )
+
+    average_masking_ratio = (
+    sum(
+        result["average_masking_ratio"]
+        for result in results
+    )
+    / len(results)
+    )
+
+    minimum_valid_tokens = min(
+    result["minimum_valid_tokens"]
+    for result in results
+    )
+
+    maximum_valid_tokens = max(
+    result["maximum_valid_tokens"]
+    for result in results
+    )
+
+    vocabulary_size = results[0][
+    "vocabulary_size"
+    ]
+
+    print(
+        "\n" + "=" * 60
+    )
+
+    print(
+        "CONSTRAINED SUMMARY"
+    )
+
+    print(
+        "=" * 60
+    )
+
+    print(
+        f"JSON validity: "
+        f"{valid_count / len(results) * 100:.2f}%"
+    )
+
+    print(
+        f"Grammar DONE rate: "
+        f"{done_count / len(results) * 100:.2f}%"
+    )
+
+    print(
+        f"Average latency: "
+        f"{average_latency:.2f} ms/token"
+    )
+
+    print(
+    f"Vocabulary size: "
+    f"{vocabulary_size:,}"
+    )
+
+    print(
+    f"Average valid tokens: "
+    f"{average_valid_tokens:.2f}"
+    )
+
+    print(
+    f"Average masked tokens: "
+    f"{average_masked_tokens:.2f}"
+    )
+
+    print(
+    f"Average masking ratio: "
+    f"{average_masking_ratio * 100:.4f}%"
+    )
+
+    print(
+    f"Minimum valid tokens: "
+        f"{minimum_valid_tokens}"
+    )
+
+    print(
+    f"Maximum valid tokens: "
+    f"{maximum_valid_tokens}"
+    )
+
+    print(
+        "=" * 60
+    )
+
+
+if __name__ == "__main__":
+
+    run_constrained_benchmark()
