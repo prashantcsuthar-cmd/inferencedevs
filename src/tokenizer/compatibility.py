@@ -2,60 +2,70 @@ from typing import List
 
 from src.schema.grammar import transition
 from src.schema.states import State
+from src.tokenizer.trie import TokenTrie
+from src.tokenizer.vocabulary import Vocabulary
 
 
 class CompatibilityEngine:
     """
-    Determines which tokenizer tokens are legal for
-    the current grammar state.
+    Compute the admissible token set A(S).
 
-    The engine tests each token by passing its decoded
-    characters through the grammar transition function.
+    The tokenizer vocabulary is indexed through the existing
+    prefix trie so shared token prefixes are checked only once.
     """
 
     def __init__(self, tokenizer):
+
         self.tokenizer = tokenizer
 
-        # Cache results so the same token does not need
-        # to be decoded repeatedly.
         self.token_text_cache = {}
 
-    def decode_token(self, token_id: int) -> str:
-        """
-        Convert a token ID into the text represented by
-        that token.
-        """
+        self.vocabulary = Vocabulary(
+            tokenizer
+        )
+
+        self.trie = TokenTrie()
+
+        self.trie.build(
+            self.vocabulary
+        )
+
+        # Cache admissible tokens for repeated states.
+        self._state_cache = {}
+
+    def decode_token(
+        self,
+        token_id: int
+    ) -> str:
 
         if token_id not in self.token_text_cache:
 
-            text = self.tokenizer.decode(
-                [token_id],
-                skip_special_tokens=False
+            self.token_text_cache[token_id] = (
+                self.tokenizer.decode(
+                    [token_id],
+                    skip_special_tokens=False
+                )
             )
 
-            self.token_text_cache[token_id] = text
-
-        return self.token_text_cache[token_id]
+        return self.token_text_cache[
+            token_id
+        ]
 
     def is_token_valid(
         self,
         state: State,
         token_id: int
     ) -> bool:
-        """
-        Check whether a single token can legally follow
-        the current grammar state.
-        """
 
-        token_text = self.decode_token(token_id)
+        token_text = self.decode_token(
+            token_id
+        )
 
-        # Empty tokens cannot advance the grammar.
         if token_text == "":
             return False
 
         current_state = state
 
-        # Test every character contained in the token.
         for char in token_text:
 
             current_state = transition(
@@ -63,9 +73,10 @@ class CompatibilityEngine:
                 char
             )
 
-            # DEAD_END means this token violates
-            # the grammar.
-            if current_state.grammar_state.name == "DEAD_END":
+            if (
+                current_state.grammar_state.name
+                == "DEAD_END"
+            ):
                 return False
 
         return True
@@ -74,21 +85,62 @@ class CompatibilityEngine:
         self,
         state: State
     ) -> List[int]:
-        """
-        Return all tokenizer token IDs that are legal
-        from the current grammar state.
-        """
+
+        cache_key = (
+            state.grammar_state,
+            state.buffer
+        )
+
+        cached = self._state_cache.get(
+            cache_key
+        )
+
+        if cached is not None:
+            return cached
 
         valid_tokens = []
 
-        vocabulary_size = len(self.tokenizer)
+        def visit(
+            node,
+            current_state
+        ):
 
-        for token_id in range(vocabulary_size):
+            # Every token ending here is legal because
+            # the entire prefix reached this node legally.
+            if node.token_ids:
 
-            if self.is_token_valid(
-                state,
-                token_id
-            ):
-                valid_tokens.append(token_id)
+                valid_tokens.extend(
+                    node.token_ids
+                )
+
+            for (
+                char,
+                child
+            ) in node.children.items():
+
+                next_state = transition(
+                    current_state,
+                    char
+                )
+
+                if (
+                    next_state.grammar_state.name
+                    == "DEAD_END"
+                ):
+                    continue
+
+                visit(
+                    child,
+                    next_state
+                )
+
+        visit(
+            self.trie.get_root(),
+            state
+        )
+
+        self._state_cache[
+            cache_key
+        ] = valid_tokens
 
         return valid_tokens
