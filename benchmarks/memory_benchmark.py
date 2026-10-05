@@ -1,227 +1,117 @@
-"""Phase 4.4 - ICE memory and resource diagnostics."""
-
-from __future__ import annotations
-
 import gc
-import json
 import os
 import sys
 import time
-from pathlib import Path
-
-import psutil
-
-
-PROJECT_ROOT = (
-    Path(__file__).resolve().parent.parent
-)
-
-if str(PROJECT_ROOT) not in sys.path:
-    sys.path.insert(
-        0,
-        str(PROJECT_ROOT)
-    )
+import torch
+from transformers import AutoModelForCausalLM, AutoTokenizer
 
 
-from src.decoding.engine import (
-    ICEDecodingEngine
-)
+def get_process_memory_mb() -> float:
+    """Returns current process Resident Set Size (RSS) memory in MB on Windows/Linux."""
+    if sys.platform == "win32":
+        import ctypes
+        from ctypes import wintypes
 
-from src.models.loader import (
-    load_qwen
-)
+        class PROCESS_MEMORY_COUNTERS(ctypes.Structure):
+            _fields_ = [
+                ("cb", wintypes.DWORD),
+                ("PageFaultCount", wintypes.DWORD),
+                ("PeakWorkingSetSize", ctypes.c_size_t),
+                ("WorkingSetSize", ctypes.c_size_t),
+                ("QuotaPeakPagedPoolUsage", ctypes.c_size_t),
+                ("QuotaPagedPoolUsage", ctypes.c_size_t),
+                ("QuotaPeakNonPagedPoolUsage", ctypes.c_size_t),
+                ("QuotaNonPagedPoolUsage", ctypes.c_size_t),
+                ("PagefileUsage", ctypes.c_size_t),
+                ("PeakPagefileUsage", ctypes.c_size_t),
+            ]
+
+        PROCESS_QUERY_INFORMATION = 0x0400
+        PROCESS_VM_READ = 0x0010
+
+        counters = PROCESS_MEMORY_COUNTERS()
+        counters.cb = ctypes.sizeof(PROCESS_MEMORY_COUNTERS)
+
+        pid = os.getpid()
+        handle = ctypes.windll.kernel32.OpenProcess(
+            PROCESS_QUERY_INFORMATION | PROCESS_VM_READ, False, pid
+        )
+        if handle:
+            try:
+                if ctypes.windll.psapi.GetProcessMemoryInfo(
+                    handle, ctypes.byref(counters), counters.cb
+                ):
+                    return counters.WorkingSetSize / (1024 * 1024)
+            finally:
+                ctypes.windll.kernel32.CloseHandle(handle)
+        return 0.0
+    else:
+        import resource
+        return resource.getrusage(resource.RUSAGE_SELF).ru_maxrss / 1024.0
 
 
-PROCESS = psutil.Process(
-    os.getpid()
-)
-
-
-def memory_mb() -> float:
-    """Return current process RSS in MB."""
-    return (
-        PROCESS.memory_info().rss
-        / (1024 * 1024)
-    )
-
-
-def json_valid(text: str) -> bool:
-    try:
-        json.loads(text)
-        return True
-    except (
-        json.JSONDecodeError,
-        TypeError
-    ):
-        return False
-
-
-def run_memory_benchmark():
-
+def main():
     print("=" * 60)
-    print("ICE PHASE 4.4 - MEMORY DIAGNOSTICS")
+    print("ICE PHASE 4.4 - MEMORY RESOURCE BENCHMARK")
     print("=" * 60)
 
-    gc.collect()
+    mem_baseline = get_process_memory_mb()
+    print(f"Baseline RSS Memory: {mem_baseline:.2f} MB")
 
-    baseline_memory = memory_mb()
+    # Force correct import tracking by pinning path constraints
+    sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
-    print(
-        f"\nMemory before model loading: "
-        f"{baseline_memory:.2f} MB"
+    from src.decoding.engine import ICEDecodingEngine
+
+    model_name = "Qwen/Qwen2.5-0.5B-Instruct"
+
+    print("\nLoading tokenizer...")
+    tokenizer = AutoTokenizer.from_pretrained(model_name)
+
+    print("Loading model...")
+    model = AutoModelForCausalLM.from_pretrained(
+        model_name,
+        dtype=torch.float32,
     )
 
-    print("\nLoading Qwen...")
+    print("\nCreating ICE Engine...")
+    engine = ICEDecodingEngine(model=model, tokenizer=tokenizer)
+    engine_loaded_mem = get_process_memory_mb()
+    print(f"Engine Loaded RSS Memory: {engine_loaded_mem:.2f} MB")
+    print(f"Model Runtime Weight Footprint: {engine_loaded_mem - mem_baseline:.2f} MB")
 
-    model, tokenizer = load_qwen()
+    test_prompt = "Extract user information into schema structure: Rahul Sharma, ORD12345, Late Delivery."
 
-    gc.collect()
+    print("\nRunning test generation run...")
+    mem_before_gen = get_process_memory_mb()
+    start_time = time.time()
 
-    model_memory = memory_mb()
+    # Call engine matching its actual method signature
+    result = engine.generate(test_prompt, max_new_tokens=64)
 
-    print(
-        f"Memory after model loading: "
-        f"{model_memory:.2f} MB"
-    )
+    elapsed = time.time() - start_time
+    mem_after_gen = get_process_memory_mb()
 
-    print("\nCreating ICE decoding engine...")
+    # Dynamic result parsing safely handles structural return types
+    if isinstance(result, dict):
+        generated_text = result.get("text", "")
+        ms_per_token = result.get("ms_per_token", 0.0)
+        tokens = result.get("generated_tokens", 0)
+    else:
+        generated_text = str(result)
+        tokens = len(tokenizer.encode(generated_text))
+        ms_per_token = (elapsed / tokens * 1000) if tokens > 0 else 0.0
 
-    engine_start = time.perf_counter()
-
-    engine = ICEDecodingEngine(
-        model,
-        tokenizer
-    )
-
-    engine_creation_time = (
-        time.perf_counter()
-        - engine_start
-    )
-
-    gc.collect()
-
-    engine_memory = memory_mb()
-
-    print(
-        f"Memory after ICE initialization: "
-        f"{engine_memory:.2f} MB"
-    )
-
-    print(
-        f"ICE initialization time: "
-        f"{engine_creation_time:.2f} seconds"
-    )
-
-    prompt = """
-Extract the following information as JSON.
-
-Customer: Rahul Sharma
-Order ID: ORD12345
-Issue: Package was delivered late.
-
-Required JSON fields:
-customer_name
-order_id
-issue
-"""
-
-    print("\nRunning constrained generation...")
-
-    generation_start_memory = memory_mb()
-
-    generation_start = time.perf_counter()
-
-    result = engine.generate(
-        prompt,
-        max_new_tokens=128
-    )
-
-    generation_time = (
-        time.perf_counter()
-        - generation_start
-    )
-
-    generation_end_memory = memory_mb()
-
-    peak_memory = max(
-        generation_start_memory,
-        generation_end_memory
-    )
-
-    print("\nGenerated output:")
-    print(result["text"])
-
-    print("\n" + "=" * 60)
-    print("PHASE 4.4 MEMORY SUMMARY")
-    print("=" * 60)
-
-    print(
-        f"Initial process memory: "
-        f"{baseline_memory:.2f} MB"
-    )
-
-    print(
-        f"After model loading: "
-        f"{model_memory:.2f} MB"
-    )
-
-    print(
-        f"After ICE initialization: "
-        f"{engine_memory:.2f} MB"
-    )
-
-    print(
-        f"Before generation: "
-        f"{generation_start_memory:.2f} MB"
-    )
-
-    print(
-        f"After generation: "
-        f"{generation_end_memory:.2f} MB"
-    )
-
-    print(
-        f"Observed generation memory: "
-        f"{peak_memory:.2f} MB"
-    )
-
-    print(
-        f"Model memory increase: "
-        f"{model_memory - baseline_memory:.2f} MB"
-    )
-
-    print(
-        f"ICE initialization increase: "
-        f"{engine_memory - model_memory:.2f} MB"
-    )
-
-    print(
-        f"Generation memory increase: "
-        f"{peak_memory - generation_start_memory:.2f} MB"
-    )
-
-    print(
-        f"Generation time: "
-        f"{generation_time:.4f} seconds"
-    )
-
-    print(
-        f"Generated tokens: "
-        f"{result['generated_tokens']}"
-    )
-
-    print(
-        f"Latency: "
-        f"{result['ms_per_token']:.2f} ms/token"
-    )
-
-    print(
-        f"Valid JSON: "
-        f"{json_valid(result['text'])}"
-    )
-
+    print("\n" + "-" * 40)
+    print("INFERENCE PROFILE RESULTS")
+    print("-" * 40)
+    print(f"Generated text: {generated_text!r}")
+    print(f"Generated tokens: {tokens}")
+    print(f"Total time: {elapsed:.4f}s | Latency: {ms_per_token:.2f} ms/token")
+    print(f"Peak RSS Memory: {mem_after_gen:.2f} MB")
+    print(f"Active Inference Transient Memory Overhead: {mem_after_gen - mem_before_gen:.2f} MB")
     print("=" * 60)
 
 
 if __name__ == "__main__":
-    run_memory_benchmark()
+    main()

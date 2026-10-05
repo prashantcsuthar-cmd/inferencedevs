@@ -71,5 +71,16 @@ class CompatibilityEngine:
 
                 stack.append((child, next_state))
 
+        # Dynamic Initial Whitespace Clipping: handled natively at the token layer
+        if state.grammar_state == GrammarState.EXPECT_OBJECT_START:
+            filtered_tokens = []
+            for tid in valid_tokens:
+                text = self.vocabulary.get_text(tid)
+                # Suppress tokens containing ONLY whitespace formatting characters
+                if text.strip() or "{" in text:
+                    filtered_tokens.append(tid)
+            if filtered_tokens:
+                valid_tokens = filtered_tokens
+
         self._state_cache[cache_key] = valid_tokens
         return valid_tokens

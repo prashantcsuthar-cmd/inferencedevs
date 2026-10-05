@@ -1,4 +1,4 @@
-"""Optimized Incremental ICE decoding engine with unified telemetry tracking."""
+"""Optimized Incremental ICE decoding engine with memoized state masking and unified telemetry."""
 
 from __future__ import annotations
 
@@ -7,14 +7,14 @@ from typing import Any
 
 import torch
 
+from src.decoding.logits_processor import ICELogitsProcessor
 from src.schema.grammar import transition
 from src.schema.states import GrammarState, State
 from src.tokenizer.compatibility import CompatibilityEngine
-from src.decoding.logits_processor import ICELogitsProcessor
 
 
 class ICEDecodingEngine:
-    """Hardware-aware ICE decoder with optimized single-pass token masking."""
+    """Hardware-aware ICE decoder with optimized single-pass token masking and dynamic state transitions."""
 
     def __init__(self, model, tokenizer, compatibility_engine=None):
         self.model = model
@@ -60,7 +60,7 @@ class ICEDecodingEngine:
             for _ in range(max_new_tokens):
                 self.processor.set_state(state)
 
-                # Single-pass extraction for telemetry and logit processing
+                # Fetch valid tokens via CompatibilityEngine
                 valid_token_ids = self.compatibility_engine.get_valid_tokens(state)
                 valid_count = len(valid_token_ids)
                 masked_count = vocabulary_size - valid_count
@@ -70,7 +70,7 @@ class ICEDecodingEngine:
                 masked_token_counts.append(masked_count)
                 masking_ratios.append(masking_ratio)
 
-                # Pass pre-computed valid IDs into processor
+                # Pass input_ids, scores, and optional valid_token_ids cleanly
                 masked_logits = self.processor(
                     input_ids, outputs.logits[:, -1, :], valid_token_ids=valid_token_ids
                 )
