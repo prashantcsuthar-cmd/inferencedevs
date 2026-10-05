@@ -1,145 +1,206 @@
 from .states import GrammarState, State
 
-
 WHITESPACE = {" ", "\t", "\n", "\r"}
 
 
 def transition(state: State, char: str) -> State:
-    """
-    Apply one character transition to the grammar state.
-
-    This is the basic transition function δ(S, character).
-    """
-
     current = state.grammar_state
 
-    # Ignore whitespace where appropriate
-    if char in WHITESPACE:
+    if current in (GrammarState.DEAD_END, GrammarState.DONE):
+        return State(GrammarState.DEAD_END) if current == GrammarState.DONE else state
+
+    # Preserve interior whitespace inside string keys and values
+    if char in WHITESPACE and current not in {
+        GrammarState.EXPECT_KEY_NAME,
+        GrammarState.READING_STRING,
+        GrammarState.READING_STRING_ESCAPE,
+    }:
         return state
 
-    # -----------------------------------------
-    # 1. Expect the beginning of an object
-    # -----------------------------------------
-    if current == GrammarState.EXPECT_OBJECT_START:
+    # 1. Object Start
+    if current in (GrammarState.START, GrammarState.EXPECT_OBJECT_START):
         if char == "{":
-            return State(GrammarState.EXPECT_KEY_QUOTE)
+            return State(
+                GrammarState.EXPECT_KEY_QUOTE,
+                expected_keys=state.expected_keys
+            )
         return State(GrammarState.DEAD_END)
 
-    # -----------------------------------------
-    # 2. Expect opening quote for a key
-    # -----------------------------------------
+    # 2. Key Opening Quote
     if current == GrammarState.EXPECT_KEY_QUOTE:
         if char == '"':
-            return State(GrammarState.EXPECT_KEY_NAME)
+            return State(
+                GrammarState.EXPECT_KEY_NAME,
+                buffer="",
+                expected_keys=state.expected_keys
+            )
+        if char == "}" and not state.expected_keys:
+            return State(GrammarState.DONE)
         return State(GrammarState.DEAD_END)
 
-    # -----------------------------------------
-    # 3. Reading the key name
-    # -----------------------------------------
+    # 3. Reading Key Name
     if current == GrammarState.EXPECT_KEY_NAME:
         if char == '"':
-            return State(GrammarState.EXPECT_COLON)
-
-        # A key cannot contain a control character
+            key_found = state.buffer
+            if state.expected_keys and key_found not in state.expected_keys:
+                return State(GrammarState.DEAD_END)
+            return State(
+                GrammarState.EXPECT_COLON,
+                current_key=key_found,
+                expected_keys=state.expected_keys
+            )
         if ord(char) < 32:
             return State(GrammarState.DEAD_END)
-
         return State(
             GrammarState.EXPECT_KEY_NAME,
-            state.buffer + char
+            buffer=state.buffer + char,
+            expected_keys=state.expected_keys
         )
 
-    # -----------------------------------------
-    # 4. Expect colon after key
-    # -----------------------------------------
+    # 4. Colon Separator
     if current == GrammarState.EXPECT_COLON:
         if char == ":":
-            return State(GrammarState.EXPECT_VALUE)
+            return State(
+                GrammarState.EXPECT_VALUE,
+                current_key=state.current_key,
+                expected_keys=state.expected_keys
+            )
         return State(GrammarState.DEAD_END)
 
-    # -----------------------------------------
-    # 5. Expect a value
-    # -----------------------------------------
+    # 5. Value Routing
     if current == GrammarState.EXPECT_VALUE:
+        if char == '"':
+            return State(
+                GrammarState.READING_STRING,
+                buffer="",
+                current_key=state.current_key,
+                expected_keys=state.expected_keys
+            )
+        if char in "0123456789-":
+            return State(
+                GrammarState.READING_NUM,
+                buffer=char,
+                current_key=state.current_key,
+                expected_keys=state.expected_keys
+            )
+        if char == "t":
+            return State(
+                GrammarState.READING_LITERAL,
+                buffer="t",
+                target_literal="true",
+                current_key=state.current_key,
+                expected_keys=state.expected_keys
+            )
+        if char == "f":
+            return State(
+                GrammarState.READING_LITERAL,
+                buffer="f",
+                target_literal="false",
+                current_key=state.current_key,
+                expected_keys=state.expected_keys
+            )
+        if char == "n":
+            return State(
+                GrammarState.READING_LITERAL,
+                buffer="n",
+                target_literal="null",
+                current_key=state.current_key,
+                expected_keys=state.expected_keys
+            )
+        return State(GrammarState.DEAD_END)
 
-        # String value
+    # 6. Reading String Values
+    if current == GrammarState.READING_STRING:
+        if char == "\\":
+            return State(
+                GrammarState.READING_STRING_ESCAPE,
+                buffer=state.buffer,
+                current_key=state.current_key,
+                expected_keys=state.expected_keys
+            )
         if char == '"':
             return State(
                 GrammarState.EXPECT_COMMA_OR_END,
-                '"'
+                current_key=state.current_key,
+                expected_keys=state.expected_keys
             )
+        if ord(char) < 32:
+            return State(GrammarState.DEAD_END)
+        return State(
+            GrammarState.READING_STRING,
+            buffer=state.buffer + char,
+            current_key=state.current_key,
+            expected_keys=state.expected_keys
+        )
 
-        # Simple non-string value
-        if char in "0123456789-tfn":
+    # 7. Escape Sequences
+    if current == GrammarState.READING_STRING_ESCAPE:
+        if char in {'"', "\\", "/", "b", "f", "n", "r", "t", "u"}:
             return State(
-                GrammarState.EXPECT_COMMA_OR_END,
-                char
+                GrammarState.READING_STRING,
+                buffer=state.buffer + char,
+                current_key=state.current_key,
+                expected_keys=state.expected_keys
             )
-
         return State(GrammarState.DEAD_END)
 
-    # -----------------------------------------
-    # 6. Expect comma or closing object
-    # -----------------------------------------
-    if current == GrammarState.EXPECT_COMMA_OR_END:
-
+    # 8. Numeric Literals
+    if current == GrammarState.READING_NUM:
+        if char in "0123456789.eE+-":
+            return State(
+                GrammarState.READING_NUM,
+                buffer=state.buffer + char,
+                current_key=state.current_key,
+                expected_keys=state.expected_keys
+            )
         if char == ",":
-            return State(GrammarState.EXPECT_KEY_QUOTE)
-
+            remaining = tuple(k for k in state.expected_keys if k != state.current_key)
+            return State(GrammarState.EXPECT_KEY_QUOTE, expected_keys=remaining)
         if char == "}":
             return State(GrammarState.DONE)
-
-        # Continue reading a value
-        if state.buffer == '"':
-            if char == '"':
-                return State(
-                    GrammarState.EXPECT_COMMA_OR_END,
-                    ""
-                )
-
+        if char in WHITESPACE:
             return State(
                 GrammarState.EXPECT_COMMA_OR_END,
-                state.buffer + char
+                current_key=state.current_key,
+                expected_keys=state.expected_keys
             )
+        return State(GrammarState.DEAD_END)
 
-        if char not in {",", "}"}:
+    # 9. Boolean / Null Literals
+    if current == GrammarState.READING_LITERAL:
+        new_buffer = state.buffer + char
+        if not state.target_literal.startswith(new_buffer):
+            return State(GrammarState.DEAD_END)
+        if new_buffer == state.target_literal:
             return State(
                 GrammarState.EXPECT_COMMA_OR_END,
-                state.buffer + char
+                current_key=state.current_key,
+                expected_keys=state.expected_keys
             )
+        return State(
+            GrammarState.READING_LITERAL,
+            buffer=new_buffer,
+            target_literal=state.target_literal,
+            current_key=state.current_key,
+            expected_keys=state.expected_keys
+        )
 
+    # 10. Delimiters
+    if current == GrammarState.EXPECT_COMMA_OR_END:
+        if char == ",":
+            remaining = tuple(k for k in state.expected_keys if k != state.current_key)
+            return State(GrammarState.EXPECT_KEY_QUOTE, expected_keys=remaining)
+        if char == "}":
+            return State(GrammarState.DONE)
         return State(GrammarState.DEAD_END)
-
-    # -----------------------------------------
-    # 7. DONE is terminal
-    # -----------------------------------------
-    if current == GrammarState.DONE:
-        return State(GrammarState.DEAD_END)
-
-    # -----------------------------------------
-    # 8. DEAD_END is terminal
-    # -----------------------------------------
-    if current == GrammarState.DEAD_END:
-        return state
 
     return State(GrammarState.DEAD_END)
 
 
 def delta_star(initial_state: State, text: str) -> State:
-    """
-    Compute δ*(S, text).
-
-    The text is processed character-by-character until:
-      - the input is consumed, or
-      - DEAD_END is reached.
-    """
-
     state = initial_state
-
     for char in text:
         state = transition(state, char)
-
         if state.grammar_state == GrammarState.DEAD_END:
             return state
-
     return state

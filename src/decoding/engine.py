@@ -1,4 +1,4 @@
-"""Incremental ICE decoding engine with Phase 4 diagnostics."""
+"""Optimized Incremental ICE decoding engine with unified telemetry tracking."""
 
 from __future__ import annotations
 
@@ -14,21 +14,17 @@ from src.decoding.logits_processor import ICELogitsProcessor
 
 
 class ICEDecodingEngine:
-    """CPU-first ICE decoder with explicit grammar-state management."""
+    """Hardware-aware ICE decoder with optimized single-pass token masking."""
 
     def __init__(self, model, tokenizer, compatibility_engine=None):
         self.model = model
         self.tokenizer = tokenizer
-
         self.compatibility_engine = (
             compatibility_engine
             if compatibility_engine is not None
             else CompatibilityEngine(tokenizer)
         )
-
-        self.processor = ICELogitsProcessor(
-            self.compatibility_engine
-        )
+        self.processor = ICELogitsProcessor(self.compatibility_engine)
 
     def generate(
         self,
@@ -36,32 +32,17 @@ class ICEDecodingEngine:
         max_new_tokens: int = 128,
     ) -> dict[str, Any]:
 
-        inputs = self.tokenizer(
-            prompt,
-            return_tensors="pt"
-        )
-
-        inputs = {
-            key: value.to(self.model.device)
-            for key, value in inputs.items()
-        }
+        inputs = self.tokenizer(prompt, return_tensors="pt")
+        inputs = {key: value.to(self.model.device) for key, value in inputs.items()}
 
         input_ids = inputs["input_ids"]
         attention_mask = inputs.get("attention_mask")
 
-        # Start from the beginning of the JSON object.
-        state = State(
-            GrammarState.EXPECT_OBJECT_START
-        )
-
+        # Start from the JSON schema grammar start state
+        state = State(GrammarState.EXPECT_OBJECT_START)
         generated_ids = []
 
-        # ---------------------------------------------------------
-        # Phase 4 diagnostics
-        # ---------------------------------------------------------
-
-        vocabulary_size = len(self.tokenizer)
-
+        vocabulary_size = getattr(self.tokenizer, "vocab_size", len(self.tokenizer))
         valid_token_counts = []
         masked_token_counts = []
         masking_ratios = []
@@ -69,140 +50,61 @@ class ICEDecodingEngine:
         start_time = time.perf_counter()
 
         with torch.no_grad():
-
-            # Initial forward pass.
             outputs = self.model(
                 input_ids=input_ids,
                 attention_mask=attention_mask,
                 use_cache=True,
             )
-
-            past_key_values = outputs.past_key_values
+            past_key_values = getattr(outputs, "past_key_values", None)
 
             for _ in range(max_new_tokens):
-
-                # Give ICE the current grammar state.
                 self.processor.set_state(state)
 
-                # -------------------------------------------------
-                # Phase 4: collect valid-token statistics.
-                # -------------------------------------------------
+                # Single-pass extraction for telemetry and logit processing
+                valid_token_ids = self.compatibility_engine.get_valid_tokens(state)
+                valid_count = len(valid_token_ids)
+                masked_count = vocabulary_size - valid_count
+                masking_ratio = masked_count / vocabulary_size if vocabulary_size else 0.0
 
-                valid_token_ids = (
-                    self.compatibility_engine.get_valid_tokens(
-                        state
-                    )
-                )
+                valid_token_counts.append(valid_count)
+                masked_token_counts.append(masked_count)
+                masking_ratios.append(masking_ratio)
 
-                valid_count = len(
-                    valid_token_ids
-                )
-
-                masked_count = (
-                    vocabulary_size
-                    - valid_count
-                )
-
-                masking_ratio = (
-                    masked_count
-                    / vocabulary_size
-                    if vocabulary_size
-                    else 0.0
-                )
-
-                valid_token_counts.append(
-                    valid_count
-                )
-
-                masked_token_counts.append(
-                    masked_count
-                )
-
-                masking_ratios.append(
-                    masking_ratio
-                )
-
-                # -------------------------------------------------
-                # Apply the actual ICE logit mask.
-                # -------------------------------------------------
-
+                # Pass pre-computed valid IDs into processor
                 masked_logits = self.processor(
-                    input_ids,
-                    outputs.logits[:, -1, :],
+                    input_ids, outputs.logits[:, -1, :], valid_token_ids=valid_token_ids
                 )
 
-                # Deterministic decoding, matching the baseline.
-                next_token = torch.argmax(
-                    masked_logits,
-                    dim=-1
-                )
+                next_token = torch.argmax(masked_logits, dim=-1)
+                token_id = int(next_token.item())
 
-                token_id = int(
-                    next_token.item()
-                )
+                # Safe token string decoding via CompatibilityEngine
+                token_text = self.compatibility_engine.decode_token(token_id)
 
-                token_text = self.tokenizer.decode(
-                    [token_id],
-                    skip_special_tokens=False,
-                )
-
-                if not token_text:
-                    raise RuntimeError(
-                        f"Token {token_id} decoded to empty text."
-                    )
-
-                # Advance grammar state using actual token text.
+                # Advance grammar state character by character
                 next_state = state
-
                 for char in token_text:
-
-                    next_state = transition(
-                        next_state,
-                        char
-                    )
-
-                    if (
-                        next_state.grammar_state
-                        == GrammarState.DEAD_END
-                    ):
+                    next_state = transition(next_state, char)
+                    if next_state.grammar_state == GrammarState.DEAD_END:
                         raise RuntimeError(
-                            f"ICE selected illegal token "
-                            f"{token_id}: {token_text!r}"
+                            f"ICE Boundary Enforcement Failure: Chosen token {token_id} ({token_text!r}) violates schema syntax."
                         )
 
-                generated_ids.append(
-                    token_id
-                )
-
+                generated_ids.append(token_id)
                 state = next_state
 
-                # JSON object is complete.
-                if (
-                    state.grammar_state
-                    == GrammarState.DONE
-                ):
+                if state.grammar_state == GrammarState.DONE:
                     break
 
-                # Feed only the newly generated token on
-                # subsequent passes using the KV cache.
                 input_ids = next_token.unsqueeze(0)
 
                 if attention_mask is not None:
-
-                    attention_mask = torch.cat(
-                        [
-                            attention_mask,
-                            torch.ones(
-                                (
-                                    attention_mask.shape[0],
-                                    1
-                                ),
-                                dtype=attention_mask.dtype,
-                                device=attention_mask.device,
-                            ),
-                        ],
-                        dim=1,
+                    new_mask_bit = torch.ones(
+                        (attention_mask.shape[0], 1),
+                        dtype=attention_mask.dtype,
+                        device=attention_mask.device,
                     )
+                    attention_mask = torch.cat([attention_mask, new_mask_bit], dim=1)
 
                 outputs = self.model(
                     input_ids=input_ids,
@@ -210,46 +112,24 @@ class ICEDecodingEngine:
                     past_key_values=past_key_values,
                     use_cache=True,
                 )
+                past_key_values = getattr(outputs, "past_key_values", None)
 
-                past_key_values = (
-                    outputs.past_key_values
-                )
-
-        elapsed = (
-            time.perf_counter()
-            - start_time
-        )
-
-        generated_text = self.tokenizer.decode(
-            generated_ids,
-            skip_special_tokens=True,
-        )
-
-        generated_tokens = len(
-            generated_ids
-        )
-
-        # ---------------------------------------------------------
-        # Phase 4 summary statistics
-        # ---------------------------------------------------------
+        elapsed = time.perf_counter() - start_time
+        generated_text = self.tokenizer.decode(generated_ids, skip_special_tokens=True)
+        generated_tokens = len(generated_ids)
 
         average_valid_tokens = (
-            sum(valid_token_counts)
-            / len(valid_token_counts)
+            sum(valid_token_counts) / len(valid_token_counts)
             if valid_token_counts
             else 0.0
         )
-
         average_masked_tokens = (
-            sum(masked_token_counts)
-            / len(masked_token_counts)
+            sum(masked_token_counts) / len(masked_token_counts)
             if masked_token_counts
             else 0.0
         )
-
         average_masking_ratio = (
-            sum(masking_ratios)
-            / len(masking_ratios)
+            sum(masking_ratios) / len(masking_ratios)
             if masking_ratios
             else 0.0
         )
@@ -257,46 +137,22 @@ class ICEDecodingEngine:
         return {
             "text": generated_text,
             "generated_tokens": generated_tokens,
-
             "elapsed_seconds": elapsed,
-
             "ms_per_token": (
-                elapsed
-                / generated_tokens
-                * 1000
-                if generated_tokens
-                else 0.0
+                (elapsed / generated_tokens * 1000) if generated_tokens else 0.0
             ),
-
             "final_state": state,
-
-            # Phase 4 diagnostics
             "vocabulary_size": vocabulary_size,
             "valid_token_counts": valid_token_counts,
             "masked_token_counts": masked_token_counts,
             "masking_ratios": masking_ratios,
-
-            "average_valid_tokens": (
-                average_valid_tokens
-            ),
-
-            "average_masked_tokens": (
-                average_masked_tokens
-            ),
-
-            "average_masking_ratio": (
-                average_masking_ratio
-            ),
-
+            "average_valid_tokens": average_valid_tokens,
+            "average_masked_tokens": average_masked_tokens,
+            "average_masking_ratio": average_masking_ratio,
             "minimum_valid_tokens": (
-                min(valid_token_counts)
-                if valid_token_counts
-                else 0
+                min(valid_token_counts) if valid_token_counts else 0
             ),
-
             "maximum_valid_tokens": (
-                max(valid_token_counts)
-                if valid_token_counts
-                else 0
+                max(valid_token_counts) if valid_token_counts else 0
             ),
         }

@@ -1,67 +1,48 @@
-from typing import Dict
+from typing import Dict, List
 
 
 class Vocabulary:
     """
-    Stores the relationship between token IDs
-    and the text represented by each token.
+    Stores character mappings for tokenizer token IDs, preserving
+    explicit byte indicators and structural whitespace across BPE formats.
     """
 
     def __init__(self, tokenizer):
-
         self.tokenizer = tokenizer
-
         self.id_to_text: Dict[int, str] = {}
-        self.text_to_ids: Dict[str, list[int]] = {}
-
+        self.text_to_ids: Dict[str, List[int]] = {}
         self._build()
 
     def _build(self):
-        """
-        Build token ID -> text and text -> token IDs mappings.
-        """
+        vocab_size = getattr(self.tokenizer, "vocab_size", len(self.tokenizer))
 
-        print("Building vocabulary...")
+        for token_id in range(vocab_size):
+            try:
+                # Primary path: convert ID to token string representation
+                raw_token = self.tokenizer.convert_ids_to_tokens(token_id)
+                if raw_token is None:
+                    text = ""
+                elif hasattr(self.tokenizer, "convert_tokens_to_string"):
+                    text = self.tokenizer.convert_tokens_to_string([raw_token])
+                else:
+                    text = self.tokenizer.decode([token_id], skip_special_tokens=False)
+            except Exception:
+                text = ""
 
-        for token_id in range(len(self.tokenizer)):
-
-            text = self.tokenizer.decode(
-                [token_id],
-                skip_special_tokens=False
-            )
+            if text is None:
+                text = ""
 
             self.id_to_text[token_id] = text
 
             if text not in self.text_to_ids:
-
                 self.text_to_ids[text] = []
-
             self.text_to_ids[text].append(token_id)
 
-        print(
-            f"Vocabulary built: "
-            f"{len(self.id_to_text)} tokens"
-        )
-
     def get_text(self, token_id: int) -> str:
-        """
-        Return the text represented by a token ID.
-        """
+        return self.id_to_text.get(token_id, "")
 
-        return self.id_to_text.get(
-            token_id,
-            ""
-        )
-
-    def get_token_ids(self, text: str) -> list[int]:
-        """
-        Return all token IDs representing the given text.
-        """
-
-        return self.text_to_ids.get(
-            text,
-            []
-        )
+    def get_token_ids(self, text: str) -> List[int]:
+        return self.text_to_ids.get(text, [])
 
     def __len__(self):
         return len(self.id_to_text)
