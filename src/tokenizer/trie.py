@@ -1,10 +1,11 @@
-from typing import Dict, List
+
+from typing import Dict, List, Optional
 
 
 class TrieNode:
-    """
-    A single node in the token trie.
-    """
+    """A node in a character-prefix trie."""
+
+    __slots__ = ("children", "token_ids")
 
     def __init__(self):
         self.children: Dict[str, "TrieNode"] = {}
@@ -13,94 +14,69 @@ class TrieNode:
 
 class TokenTrie:
     """
-    Prefix tree for tokenizer tokens.
+    Prefix trie over the text fragments supplied by Vocabulary.
 
-    Each character in a token becomes a path
-    through the trie.
-
-    Example:
-
-        token = "name"
-
-        root
-          |
-          n
-          |
-          a
-          |
-          m
-          |
-          e
+    Every terminal node stores all token IDs represented by that exact
+    text fragment. Special and unsafe tokens should be excluded by the
+    vocabulary layer before insertion.
     """
 
     def __init__(self):
         self.root = TrieNode()
+        self.token_count = 0
+        self.node_count = 1
 
     def insert(self, text: str, token_id: int) -> None:
-        """
-        Insert one token into the trie.
-        """
-
-        # Ignore empty token text.
-        if not text:
+        """Insert a non-empty text fragment and its token ID."""
+        if not isinstance(text, str) or not text:
             return
 
         node = self.root
 
-        # Create one trie node for each character.
         for char in text:
+            child = node.children.get(char)
 
-            if char not in node.children:
-                node.children[char] = TrieNode()
+            if child is None:
+                child = TrieNode()
+                node.children[char] = child
+                self.node_count += 1
 
-            node = node.children[char]
+            node = child
 
-        # Store the token ID at the final node.
-        node.token_ids.append(token_id)
+        if token_id not in node.token_ids:
+            node.token_ids.append(token_id)
+            self.token_count += 1
 
     def build(self, vocabulary) -> None:
-        """
-        Build the trie from a Vocabulary object.
-        """
+        """Build the trie from a Vocabulary instance."""
+        self.root = TrieNode()
+        self.token_count = 0
+        self.node_count = 1
 
-        for token_id, text in vocabulary.id_to_text.items():
+        for token_id in vocabulary.get_text_token_ids():
+            text = vocabulary.get_text(token_id)
             self.insert(text, token_id)
 
     def get_root(self) -> TrieNode:
-        """
-        Return the root node.
-        """
-
         return self.root
 
-    def get_node(self, text: str):
-        """
-        Find the trie node corresponding to a text prefix.
-
-        Returns:
-            TrieNode if the prefix exists.
-            None otherwise.
-        """
-
+    def get_node(self, text: str) -> Optional[TrieNode]:
+        """Return the node for a prefix, or None if it does not exist."""
         node = self.root
 
         for char in text:
+            node = node.children.get(char)
 
-            if char not in node.children:
+            if node is None:
                 return None
-
-            node = node.children[char]
 
         return node
 
     def get_token_ids(self, text: str) -> List[int]:
-        """
-        Return token IDs that exactly match the given text.
-        """
-
+        """Return IDs ending exactly at the specified text."""
         node = self.get_node(text)
 
         if node is None:
             return []
 
-        return node.token_ids
+        return list(node.token_ids)
