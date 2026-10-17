@@ -1,0 +1,256 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="theme-color" content="#0B0F17" />
+  <title>ICE Engine | Inference Compatibility & Enforcement</title>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+
+  <link rel="stylesheet" href="style.css" />
+
+  <!-- Animation and 3D visualization libraries -->
+  <script defer src="https://cdn.jsdelivr.net/npm/gsap@3.14.2/dist/gsap.min.js"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.min.js"></script>
+  <script defer src="app.js"></script>
+</head>
+
+<body>
+  <div class="app-shell">
+    <header class="topbar">
+      <a class="brand" href="#" aria-label="ICE Engine home">
+        <div class="brand-mark">ICE<span>.</span></div>
+        <div>
+          <div class="brand-name">ICE Engine</div>
+          <div class="brand-caption">INFERENCE COMPATIBILITY & ENFORCEMENT</div>
+        </div>
+      </a>
+
+      <div class="system-status">
+        <span class="status-dot"></span>
+        <span>LOCAL INFERENCE</span>
+        <span class="status-divider">/</span>
+        <span class="muted">QWEN-1.5B</span>
+        <span class="airgapped">AIR-GAPPED</span>
+      </div>
+
+      <div class="header-actions">
+        <span class="demo-label"><span class="demo-dot"></span> DEMO MODE</span>
+        <button class="icon-button" id="resetButton" title="Reset dashboard" aria-label="Reset dashboard">↻</button>
+      </div>
+    </header>
+
+    <main class="dashboard">
+      <section class="page-heading">
+        <div>
+          <div class="eyebrow"><span class="eyebrow-line"></span> CONSTRAINED DECODING / OBSERVABILITY</div>
+          <h1>Inference, <span>under control.</span></h1>
+          <p class="page-description">Watch unconstrained generation meet deterministic, schema-valid decoding.</p>
+        </div>
+
+        <div class="heading-meta">
+          <span class="live-indicator"></span>
+          <span id="connectionLabel">SIMULATED TELEMETRY</span>
+        </div>
+      </section>
+
+      <section class="metrics-grid" aria-label="Performance overview">
+        <article class="metric-card">
+          <div class="metric-top">
+            <span class="metric-label">TOKENS PROCESSED</span>
+            <span class="metric-icon blue">⌘</span>
+          </div>
+          <div class="metric-value" id="tokensProcessed">12,480</div>
+          <div class="metric-foot"><span class="positive">↗ Streaming</span><span>Session total</span></div>
+          <div class="metric-track"><span class="track-blue" style="width:68%"></span></div>
+        </article>
+
+        <article class="metric-card">
+          <div class="metric-top">
+            <span class="metric-label">LATENCY / TOKEN</span>
+            <span class="metric-icon green">◷</span>
+          </div>
+          <div class="metric-value"><span id="latencyValue">402.7</span><small> ms</small></div>
+          <div class="metric-foot"><span class="positive">Inference telemetry</span><span>Per token</span></div>
+          <div class="metric-track"><span class="track-green" id="latencyTrack" style="width:42%"></span></div>
+        </article>
+
+        <article class="metric-card">
+          <div class="metric-top">
+            <span class="metric-label">VOCABULARY PRUNED</span>
+            <span class="metric-icon purple">⌁</span>
+          </div>
+          <div class="metric-value"><span id="prunedValue">99.20</span><small>%</small></div>
+          <div class="metric-foot"><span class="positive">Constraint efficiency</span><span>Per decoding step</span></div>
+          <div class="metric-track"><span class="track-purple" id="prunedTrack" style="width:99.2%"></span></div>
+        </article>
+
+        <article class="metric-card">
+          <div class="metric-top">
+            <span class="metric-label">SCHEMA RETRIES</span>
+            <span class="metric-icon green">✓</span>
+          </div>
+          <div class="metric-value">0<small class="value-context"> retries</small></div>
+          <div class="metric-foot"><span class="positive">ICE-guided output</span><span>Demo session</span></div>
+          <div class="metric-track"><span class="track-green" style="width:100%"></span></div>
+        </article>
+      </section>
+
+      <section class="section-block">
+        <div class="section-heading">
+          <div>
+            <div class="section-kicker">01 / GENERATION PIPELINE</div>
+            <h2>Constraint comparison</h2>
+          </div>
+          <label class="scenario-control">
+            <span>TEST SCENARIO</span>
+            <select id="scenarioSelect">
+              <option value="drone">Drone flight path</option>
+              <option value="finance">Financial transaction</option>
+              <option value="api">Strict API system call</option>
+            </select>
+          </label>
+        </div>
+
+        <div class="comparison-grid">
+          <article class="stream-card baseline-card">
+            <div class="stream-header">
+              <div class="stream-title-wrap">
+                <span class="stream-symbol danger-symbol">×</span>
+                <div>
+                  <h3>RAW SLM</h3>
+                  <p>UNCONSTRAINED BASELINE</p>
+                </div>
+              </div>
+              <span class="pill pill-danger"><span class="pill-dot"></span> UNGUARDED</span>
+            </div>
+            <div class="stream-toolbar"><span>OUTPUT STREAM</span><span id="baselineLineCount">READY</span></div>
+            <pre class="code-stream baseline-output" id="baselineOutput" aria-live="polite"></pre>
+            <div class="stream-footer danger-footer">
+              <span class="footer-status"><span class="status-dot red-dot"></span><span id="baselineStatus">Potential syntax failure</span></span>
+              <span>RETRY RISK: HIGH</span>
+            </div>
+          </article>
+
+          <article class="stream-card ice-card">
+            <div class="stream-header">
+              <div class="stream-title-wrap">
+                <span class="stream-symbol success-symbol">✓</span>
+                <div>
+                  <h3>ICE-GUIDED</h3>
+                  <p>DETERMINISTIC DECODING</p>
+                </div>
+              </div>
+              <span class="pill pill-success"><span class="pill-dot"></span> CONSTRAINED</span>
+            </div>
+            <div class="stream-toolbar"><span>VALIDATED OUTPUT STREAM</span><span class="stream-live"><span class="status-dot"></span> LIVE</span></div>
+            <pre class="code-stream ice-output" id="iceOutput" aria-live="polite"></pre>
+            <div class="stream-footer success-footer">
+              <span class="footer-status"><span class="status-dot"></span><span id="iceStatus">Schema-valid output</span></span>
+              <span>RETRIES: 0</span>
+            </div>
+          </article>
+        </div>
+
+        <div class="action-row">
+          <div class="action-note"><span class="info-icon">i</span> Demonstration data only. Live inference requires backend integration.</div>
+          <button class="primary-button" id="runDemoButton"><span>▶</span> Run demonstration</button>
+        </div>
+      </section>
+
+      <section class="section-block inspector-section">
+        <div class="section-heading">
+          <div>
+            <div class="section-kicker">02 / DECODING INTELLIGENCE</div>
+            <h2>Vocabulary masking inspector</h2>
+            <p class="section-description">A local view of the token space allowed by the active grammar state.</p>
+          </div>
+          <div class="grammar-badge"><span class="status-dot"></span><span id="grammarState">EXPECT_OBJECT_KEY</span></div>
+        </div>
+
+        <div class="inspector-grid">
+          <article class="panel vocab-panel">
+            <div class="panel-heading">
+              <div><span class="panel-title">VOCABULARY MATRIX</span><span class="panel-subtitle">Token eligibility at current step</span></div>
+              <span class="mini-tag">151,643 TOTAL</span>
+            </div>
+
+            <div class="vocab-summary">
+              <div><span class="legend-dot allowed-dot"></span><span class="legend-label">Allowed tokens</span><strong id="allowedCount">1,210</strong></div>
+              <div><span class="legend-dot masked-dot"></span><span class="legend-label">Masked tokens</span><strong id="maskedCount">150,433</strong></div>
+            </div>
+
+            <div class="vocab-bar" aria-label="Allowed and masked token distribution">
+              <span class="vocab-allowed" id="allowedBar" style="width:0.8%"></span>
+              <span class="vocab-masked" id="maskedBar" style="width:99.2%"></span>
+            </div>
+            <div class="bar-labels"><span>0</span><span>151,643 tokens</span></div>
+
+            <div class="masked-callout">
+              <div class="masked-callout-icon">−∞</div>
+              <div><strong id="maskedRatio">99.20% VOCABULARY MASKED</strong><p>Invalid next-token candidates receive a negative-infinity logit.</p></div>
+            </div>
+
+            <div class="allowed-heading"><span>ALLOWED TOKEN SAMPLES</span><span>TOP CANDIDATES</span></div>
+            <div class="token-pills" id="tokenPills"></div>
+          </article>
+
+          <article class="panel trie-panel">
+            <div class="panel-heading">
+              <div><span class="panel-title">PREFIX TRIE</span><span class="panel-subtitle">Localized active subtree</span></div>
+              <span class="mini-tag green-tag"><span class="status-dot"></span> 3D VIEW</span>
+            </div>
+            <div class="trie-canvas-wrap" id="trieCanvas">
+              <div class="trie-overlay trie-overlay-top"><span>ACTIVE PATH</span><span>LOCAL SUBTREE</span></div>
+              <div class="trie-loading" id="trieFallback">Initializing trie visualization…</div>
+              <div class="trie-overlay trie-overlay-bottom"><span>DRAG TO ROTATE</span><span>SCENE LIMIT: 50 OBJECTS</span></div>
+            </div>
+            <div class="trie-legend">
+              <span><i class="legend-node root-node"></i> Active root</span>
+              <span><i class="legend-node path-node"></i> Prefix path</span>
+              <span><i class="legend-node branch-node"></i> Allowed branches</span>
+            </div>
+          </article>
+        </div>
+      </section>
+
+      <section class="section-block resource-section">
+        <div class="section-heading">
+          <div>
+            <div class="section-kicker">03 / EDGE PERFORMANCE</div>
+            <h2>Resource footprint</h2>
+          </div>
+          <span class="mini-tag">SESSION ESTIMATES</span>
+        </div>
+
+        <div class="resource-grid">
+          <article class="resource-card">
+            <div class="resource-icon blue">▤</div>
+            <div class="resource-content"><span>PROCESS MEMORY</span><strong>1.42 <small>GB</small></strong><p>Local inference footprint</p></div>
+            <div class="resource-side"><span class="resource-dot blue-dot"></span> MONITORED</div>
+          </article>
+          <article class="resource-card">
+            <div class="resource-icon green">ϟ</div>
+            <div class="resource-content"><span>DECODING OVERHEAD</span><strong>Low <small>overhead</small></strong><p>Constraint enforcement</p></div>
+            <div class="resource-side"><span class="resource-dot"></span> OPTIMIZED</div>
+          </article>
+          <article class="resource-card">
+            <div class="resource-icon purple">⌁</div>
+            <div class="resource-content"><span>RETRY PREVENTION</span><strong>100<small>%</small></strong><p>In this demonstration</p></div>
+            <div class="resource-side"><span class="resource-dot"></span> ENFORCED</div>
+          </article>
+        </div>
+      </section>
+
+      <footer class="footer">
+        <div><span class="footer-brand">ICE<span>.</span></span> Inference Compatibility & Enforcement Engine</div>
+        <div>LOCAL-FIRST ARCHITECTURE <span class="footer-separator">/</span> <span id="footerStatus">DEMO MODE</span></div>
+      </footer>
+    </main>
+  </div>
+</body>
+</html>
