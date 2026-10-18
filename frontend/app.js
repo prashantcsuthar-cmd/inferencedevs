@@ -1,75 +1,11 @@
 
 "use strict";
 
-// ICE Engine frontend.
-// All numbers and generation output in this version are simulated demo data.
+// ICE Engine frontend connected to the FastAPI SSE stream.
 
-const TOTAL_VOCAB = 151643;
-const API_URL = "http://127.0.0.1:8000";
-
-const scenarios = {
-  drone: {
-    state: "EXPECT_OBJECT_KEY",
-    allowed: 1210,
-    baseline: `Here is your drone flight path!
-{
-  "mission": "survey",
-  "waypoints": [
-    {"lat": 12.97, "lon": 77.59,},
-    {"lat": 13.01, "lon": 77.62}
-  ],
-  "status": "ready"`,
-    ice: {
-      mission: "survey",
-      waypoints: [
-        { lat: 12.97, lon: 77.59, altitude: 120 },
-        { lat: 13.01, lon: 77.62, altitude: 150 }
-      ],
-      status: "ready"
-    },
-    tokens: ['"mission"', '"waypoints"', '"status"', '"altitude"', '"ready"']
-  },
-  finance: {
-    state: "EXPECT_PROPERTY_VALUE",
-    allowed: 864,
-    baseline: `Transaction approved, here you go:
-{
-  "transaction_id": "TX-4821",
-  "amount": 2500.00,
-  "currency": "INR",
-  "approved": true,
-}`,
-    ice: {
-      transaction_id: "TX-4821",
-      amount: 2500,
-      currency: "INR",
-      approved: true
-    },
-    tokens: ['"transaction_id"', '"amount"', '"currency"', '"INR"', '"approved"']
-  },
-  api: {
-    state: "EXPECT_OBJECT_KEY",
-    allowed: 642,
-    baseline: `Calling the API now:
-{
-  "tool": "search_records",
-  "arguments": {
-    "query": "active users",
-    "limit": "many"
-  },
-  "execute": true,
-}`,
-    ice: {
-      tool: "search_records",
-      arguments: {
-        query: "active users",
-        limit: 10
-      },
-      execute: true
-    },
-    tokens: ['"tool"', '"arguments"', '"query"', '"limit"', '"execute"']
-  }
-};
+const API_URL = window.ICE_API_URL || (
+  window.location.protocol === "file:" ? "http://127.0.0.1:8000" : window.location.origin
+);
 
 const $ = (id) => document.getElementById(id);
 
@@ -101,7 +37,7 @@ const elements = {
   fallback: $("trieFallback")
 };
 
-let demoTimer = null;
+let activeRequest = null;
 let threeScene = null;
 let threeCamera = null;
 let threeRenderer = null;
@@ -109,55 +45,14 @@ let threeRoot = null;
 let animationFrame = null;
 let resizeObserver = null;
 let pointerState = null;
-let sessionTokens = 12480;
 
 function formatNumber(value) {
   return Math.round(value).toLocaleString("en-US");
 }
 
-function animateValue(element, from, to, duration = 0.45) {
-  if (!element) return;
-
-  if (window.gsap) {
-    gsap.killTweensOf(element);
-    const counter = { value: from };
-
-    gsap.to(counter, {
-      value: to,
-      duration,
-      ease: "power2.out",
-      onUpdate: () => {
-        element.textContent = formatNumber(counter.value);
-      }
-    });
-  } else {
-    element.textContent = formatNumber(to);
-  }
-}
-
 function setMetric(id, value) {
   const element = $(id);
   if (element) element.textContent = value;
-}
-
-function updateTelemetry(allowed, latency = 402.7) {
-  const safeAllowed = Math.max(0, Math.min(TOTAL_VOCAB, allowed));
-  const masked = TOTAL_VOCAB - safeAllowed;
-  const maskedRatio = (masked / TOTAL_VOCAB) * 100;
-  const allowedRatio = (safeAllowed / TOTAL_VOCAB) * 100;
-
-  animateValue(elements.allowed, Number(elements.allowed.textContent.replaceAll(",", "")) || 0, safeAllowed);
-  animateValue(elements.masked, Number(elements.masked.textContent.replaceAll(",", "")) || 0, masked);
-
-  elements.allowedBar.style.width = `${allowedRatio}%`;
-  elements.maskedBar.style.width = `${100 - allowedRatio}%`;
-
-  setMetric("maskedRatio", `${maskedRatio.toFixed(2)}% VOCABULARY MASKED`);
-  setMetric("prunedValue", maskedRatio.toFixed(2));
-  elements.prunedTrack.style.width = `${maskedRatio}%`;
-
-  setMetric("latencyValue", latency.toFixed(1));
-  elements.latencyTrack.style.width = `${Math.max(4, Math.min(100, latency / 8))}%`;
 }
 
 function renderTokenPills(tokens) {
@@ -184,195 +79,140 @@ function renderJsonOutput(target, value) {
   target.scrollTop = 0;
 }
 
-function streamText(target, text, options = {}) {
-  const speed = options.speed ?? 10;
-  const onComplete = options.onComplete ?? (() => {});
-  let index = 0;
-
-  target.textContent = "";
-
-  return new Promise((resolve) => {
-    function writeNext() {
-      if (index >= text.length) {
-        onComplete();
-        resolve();
-        return;
-      }
-
-      const chunkSize = Math.min(3, text.length - index);
-      target.textContent += text.slice(index, index + chunkSize);
-      index += chunkSize;
-      target.scrollTop = target.scrollHeight;
-
-      if (window.gsap && options.animate && index <= 12) {
-        gsap.fromTo(
-          target,
-          { opacity: 0.65 },
-          { opacity: 1, duration: 0.15 }
-        );
-      }
-
-      demoTimer = setTimeout(writeNext, speed);
-    }
-
-    writeNext();
-  });
-}
-
 function stopDemo() {
-  if (demoTimer !== null) {
-    clearTimeout(demoTimer);
-    demoTimer = null;
+  if (activeRequest) {
+    activeRequest.abort();
+    activeRequest = null;
   }
-
   if (elements.run) {
     elements.run.disabled = false;
-    elements.run.innerHTML = "<span>▶</span> Run demonstration";
+    elements.run.textContent = "Run inference";
   }
 }
-
 
 async function runDemonstration() {
   stopDemo();
-
-  const scenarioName = elements.scenario.value;
-
   const prompts = {
     drone: "Generate a JSON object for a drone survey flight with waypoints containing latitude, longitude, and altitude, and a mission status.",
     finance: "Generate a JSON object for a financial transaction with transaction_id, amount, currency, and approved fields.",
     api: "Generate a JSON object for an API tool call with tool, arguments containing query and limit, and execute fields."
   };
+  const startedAt = performance.now();
+  const controller = new AbortController();
+  activeRequest = controller;
+  let tokenCount = 0;
+  let buffer = "";
 
   elements.run.disabled = true;
   elements.run.textContent = "Running ICE inference...";
-
   elements.baselineCard.classList.remove("has-error");
-  elements.baselineStatus.textContent = "Baseline simulation unavailable";
-  elements.baselineLines.textContent = "REAL ICE REQUEST";
-  elements.iceStatus.textContent = "Sending request to backend...";
+  elements.baseline.textContent = "";
+  elements.ice.textContent = "";
+  elements.baselineLines.textContent = "CONNECTING";
+  elements.baselineStatus.textContent = "Waiting for baseline tokens...";
+  elements.iceStatus.textContent = "Connecting to inference engine...";
+  elements.grammar.textContent = "INITIALIZING";
   elements.connection.textContent = "CONNECTING TO ICE API";
   elements.footer.textContent = "LIVE INFERENCE";
 
-  elements.baseline.textContent =
-    "Unconstrained baseline is not connected to a backend endpoint yet.";
+  const appendEvent = (rawEvent) => {
+    const data = rawEvent.split("\n").filter((line) => line.startsWith("data:"))
+      .map((line) => line.slice(5).trim()).join("\n");
+    if (!data) return;
+    const event = JSON.parse(data);
+    if (event.error) throw new Error(event.error);
 
-  elements.ice.textContent = "";
-  elements.grammar.textContent = "GENERATING";
+    if (event.runner_type === "ice") {
+      elements.ice.textContent += event.token_text || "";
+      elements.ice.scrollTop = elements.ice.scrollHeight;
+      elements.grammar.textContent = event.active_grammar_state || event.status || "GENERATING";
+      elements.iceStatus.textContent = event.status || "Generating";
+      const telemetry = event.telemetry || {};
+      if (telemetry.total_vocab) {
+        tokenCount++;
+        const size = Number(telemetry.total_vocab);
+        const valid = Number(telemetry.valid_count) || 0;
+        const masked = Math.max(0, size - valid);
+        const ratio = Number(telemetry.masking_ratio) || 0;
+        elements.allowed.textContent = formatNumber(valid);
+        elements.masked.textContent = formatNumber(masked);
+        elements.allowedBar.style.width = `${(valid / size * 100).toFixed(2)}%`;
+        elements.maskedBar.style.width = `${(masked / size * 100).toFixed(2)}%`;
+        setMetric("maskedRatio", `${(ratio * 100).toFixed(2)}% VOCABULARY MASKED`);
+        setMetric("prunedValue", (ratio * 100).toFixed(2));
+        elements.prunedTrack.style.width = `${(ratio * 100).toFixed(2)}%`;
+        const latency = Number(telemetry.ms_per_token) || 0;
+        setMetric("latencyValue", latency.toFixed(1));
+        elements.latencyTrack.style.width = `${Math.max(4, Math.min(100, latency / 8))}%`;
+        setMetric("tokensProcessed", formatNumber(tokenCount));
+        renderTokenPills(event.sample_allowed_tokens || []);
+      }
+    } else if (event.runner_type === "baseline") {
+      elements.baseline.textContent += event.token_text || "";
+      elements.baseline.scrollTop = elements.baseline.scrollHeight;
+      elements.baselineLines.textContent = `STEP ${event.step}`;
+      elements.baselineStatus.textContent = event.status || "Generating";
+      elements.baselineCard.classList.toggle("has-error", Boolean(event.has_error));
+    }
+  };
 
   try {
-    const response = await fetch(`${API_URL}/generate`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify({
-        prompt: prompts[scenarioName] || prompts.drone,
-        max_new_tokens: 128
-      })
-    });
-
-    const result = await response.json();
-
-    if (!response.ok) {
-      throw new Error(result.detail || "ICE API request failed.");
-    }
-
-    // Show the actual text produced by the ICE engine.
-    elements.ice.textContent = result.text || "";
-    elements.ice.scrollTop = 0;
-
-    // Display real inference diagnostics.
-    animateValue(
-      elements.tokens,
-      Number(elements.tokens.textContent.replaceAll(",", "")) || 0,
-      result.generated_tokens || 0
-    );
-
-    const latency = Number(result.ms_per_token) || 0;
-    const vocabularySize = Number(result.vocabulary_size) || TOTAL_VOCAB;
-    const validTokens = Number(result.average_valid_tokens) || 0;
-    const maskedTokens = Number(result.average_masked_tokens) || 0;
-    const maskingRatio = Number(result.average_masking_ratio) || 0;
-
-    setMetric("latencyValue", latency.toFixed(1));
-    setMetric("prunedValue", (maskingRatio * 100).toFixed(2));
-
-    elements.latencyTrack.style.width =
-      `${Math.max(4, Math.min(100, latency / 8))}%`;
-
-    elements.prunedTrack.style.width =
-      `${Math.max(0, Math.min(100, maskingRatio * 100))}%`;
-
-    elements.allowed.textContent = formatNumber(validTokens);
-    elements.masked.textContent = formatNumber(maskedTokens);
-
-    const allowedRatio = vocabularySize
-      ? (validTokens / vocabularySize) * 100
-      : 0;
-
-    elements.allowedBar.style.width =
-      `${Math.max(0, Math.min(100, allowedRatio))}%`;
-
-    elements.maskedBar.style.width =
-      `${Math.max(0, Math.min(100, 100 - allowedRatio))}%`;
-
-    setMetric(
-      "maskedRatio",
-      `${(maskingRatio * 100).toFixed(2)}% VOCABULARY MASKED`
-    );
-
-    elements.grammar.textContent = result.final_state || "COMPLETED";
-    elements.iceStatus.textContent = "Actual ICE response received";
+    const url = new URL(`${API_URL}/stream`);
+    url.searchParams.set("prompt", prompts[elements.scenario.value] || prompts.drone);
+    const response = await fetch(url, { signal: controller.signal, headers: { Accept: "text/event-stream" } });
+    if (!response.ok) throw new Error((await response.text()) || `Backend returned HTTP ${response.status}`);
+    if (!response.body) throw new Error("This browser does not support streaming responses.");
     elements.connection.textContent = "CONNECTED TO ICE API";
-    elements.footer.textContent =
-      `LIVE INFERENCE · ${Number(result.elapsed_seconds).toFixed(2)} s`;
 
-    // Display token IDs' associated diagnostic counts as a compact sample.
-    renderTokenPills(
-      (result.valid_token_counts || [])
-        .slice(0, 8)
-        .map((count, index) => `Step ${index + 1}: ${count} valid`)
-    );
-
-    elements.baselineStatus.textContent =
-      "No baseline API endpoint configured";
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    while (true) {
+      const { value, done } = await reader.read();
+      buffer += decoder.decode(value || new Uint8Array(), { stream: !done });
+      const events = buffer.split("\n\n");
+      buffer = events.pop() || "";
+      events.forEach(appendEvent);
+      if (done) break;
+    }
+    if (buffer.trim()) appendEvent(buffer);
+    elements.footer.textContent = `LIVE INFERENCE | ${((performance.now() - startedAt) / 1000).toFixed(2)} s`;
   } catch (error) {
-    elements.iceStatus.textContent = "Inference request failed";
-    elements.connection.textContent = "API CONNECTION ERROR";
-    elements.footer.textContent = "REQUEST FAILED";
-    elements.ice.textContent =
-      `${error.message}\n\nCheck that the backend is running at ${API_URL}.`;
-
-    console.error("ICE API error:", error);
+    if (error.name !== "AbortError") {
+      elements.iceStatus.textContent = "Inference request failed";
+      elements.connection.textContent = "API CONNECTION ERROR";
+      elements.footer.textContent = "REQUEST FAILED";
+      elements.ice.textContent += `\n\n${error.message}\nCheck that the backend is running at ${API_URL}.`;
+      console.error("ICE API error:", error);
+    }
   } finally {
-    elements.run.disabled = false;
-    elements.run.textContent = "↻ Run again";
+    if (activeRequest === controller) {
+      activeRequest = null;
+      elements.run.disabled = false;
+      elements.run.innerHTML = "Run again";
+    }
   }
 }
 
-
 function resetDashboard() {
   stopDemo();
-  sessionTokens = 12480;
-
-  setMetric("tokensProcessed", "12,480");
-  setMetric("latencyValue", "402.7");
-  setMetric("prunedValue", "99.20");
-
+  setMetric("tokensProcessed", "0");
+  setMetric("latencyValue", "--");
+  setMetric("prunedValue", "--");
+  elements.allowed.textContent = "--";
+  elements.masked.textContent = "--";
+  elements.allowedBar.style.width = "0%";
+  elements.maskedBar.style.width = "0%";
+  elements.prunedTrack.style.width = "0%";
+  elements.latencyTrack.style.width = "0%";
   elements.baseline.textContent = "";
   elements.ice.textContent = "";
   elements.baselineCard.classList.remove("has-error");
-
-  elements.baselineStatus.textContent = "Potential syntax failure";
+  elements.baselineStatus.textContent = "Ready";
   elements.baselineLines.textContent = "READY";
-  elements.iceStatus.textContent = "Schema-valid output";
-  elements.grammar.textContent = "EXPECT_OBJECT_KEY";
-  elements.connection.textContent = "SIMULATED TELEMETRY";
-  elements.footer.textContent = "DEMO MODE";
-
-  elements.scenario.value = "drone";
-  updateTelemetry(1210, 402.7);
-  renderTokenPills(scenarios.drone.tokens);
+  elements.iceStatus.textContent = "Ready";
+  elements.grammar.textContent = "READY";
+  elements.pills.replaceChildren();
+  elements.footer.textContent = "READY";
 }
 
 // -----------------------------
@@ -545,18 +385,6 @@ function initTrie() {
 elements.run.addEventListener("click", runDemonstration);
 elements.reset.addEventListener("click", resetDashboard);
 
-elements.scenario.addEventListener("change", () => {
-  const scenario = scenarios[elements.scenario.value];
-  if (!scenario) return;
-
-  elements.grammar.textContent = scenario.state;
-  updateTelemetry(scenario.allowed);
-  renderTokenPills(scenario.tokens);
-});
-
-renderTokenPills(scenarios.drone.tokens);
-updateTelemetry(1210, 402.7);
-
 if (window.gsap) {
   gsap.from(".metric-card", {
     opacity: 0,
@@ -569,5 +397,17 @@ if (window.gsap) {
 
 initTrie();
 
-// Keep this frontend self-contained. Backend integration will be added
-// after we confirm the actual API request body and streaming event format.
+// Reflect the backend/model readiness returned by FastAPI.
+fetch(`${API_URL}/status`)
+  .then((response) => {
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    return response.json();
+  })
+  .then((status) => {
+    elements.connection.textContent = `BACKEND ${status.status}`;
+    elements.footer.textContent = `${status.device || "LOCAL"} | READY`;
+  })
+  .catch(() => {
+    elements.connection.textContent = "BACKEND OFFLINE";
+    elements.footer.textContent = `START SERVER AT ${API_URL}`;
+  });

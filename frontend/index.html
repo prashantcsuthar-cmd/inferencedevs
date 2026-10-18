@@ -34,12 +34,12 @@
         <span class="status-dot"></span>
         <span>LOCAL INFERENCE</span>
         <span class="status-divider">/</span>
-        <span class="muted">QWEN-1.5B</span>
-        <span class="airgapped">AIR-GAPPED</span>
+        <span class="muted">QWEN2.5-0.5B</span>
+        <span class="airgapped">MODEL: LOCAL</span>
       </div>
 
       <div class="header-actions">
-        <span class="demo-label"><span class="demo-dot"></span> DEMO MODE</span>
+        <span class="demo-label"><span class="demo-dot"></span> LIVE BACKEND</span>
         <button class="icon-button" id="resetButton" title="Reset dashboard" aria-label="Reset dashboard">↻</button>
       </div>
     </header>
@@ -54,7 +54,7 @@
 
         <div class="heading-meta">
           <span class="live-indicator"></span>
-          <span id="connectionLabel">SIMULATED TELEMETRY</span>
+          <span id="connectionLabel">CHECKING BACKEND</span>
         </div>
       </section>
 
@@ -157,8 +157,8 @@
         </div>
 
         <div class="action-row">
-          <div class="action-note"><span class="info-icon">i</span> Demonstration data only. Live inference requires backend integration.</div>
-          <button class="primary-button" id="runDemoButton"><span>▶</span> Run demonstration</button>
+          <div class="action-note"><span class="info-icon">i</span> Runs local ICE and baseline inference through the connected backend.</div>
+          <button class="primary-button" id="runDemoButton"><span>▶</span> Run inference</button>
         </div>
       </section>
 

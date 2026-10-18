@@ -150,3 +150,15 @@ git commit -m "feat: implement Phase X <module_name>"
 # Push to repository
 git push origin main
 ```
+
+
+## Run the live dashboard
+
+The FastAPI server serves both the frontend and API. From the project root, install dependencies and start it with:
+
+```bash
+pip install -r requirements.txt
+py -m uvicorn main:app --reload --host 127.0.0.1 --port 8000
+```
+
+Open [http://127.0.0.1:8000](http://127.0.0.1:8000). The first startup loads the configured Qwen model; `/status` reports readiness, and **Run inference** streams ICE and baseline tokens from `/stream`. You can also serve `frontend/` separately; set `window.ICE_API_URL` to the backend origin before `app.js` loads if it is on another host.

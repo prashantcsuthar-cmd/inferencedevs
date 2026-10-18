@@ -11,6 +11,8 @@ import torch
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
+from fastapi.staticfiles import StaticFiles
+from pathlib import Path
 
 # Enforce project path bounds cleanly
 sys.path.insert(0, os.path.abspath(os.path.dirname(__file__)))
@@ -127,7 +129,7 @@ async def stream_generation(prompt: str, request: Request):
 
                 with torch.inference_mode():
                     masked_logits = ENGINE.processor(
-                        ice_input_ids, ice_outputs.logits[:, -1, :], valid_token_ids=valid_token_ids
+                        ice_input_ids, ice_outputs.logits[:, -1, :]
                     )
                     next_ice_token = torch.argmax(masked_logits, dim=-1)
                     ice_token_id = int(next_ice_token.item())
@@ -255,3 +257,7 @@ async def stream_generation(prompt: str, request: Request):
         print(f"Dual-stream inference completed successfully in {step_index} steps.")
 
     return StreamingResponse(sse_event_generator(), media_type="text/event-stream")
+
+# Serve the dashboard from the same origin as the API. API routes above take
+# precedence, while the root and its relative JS/CSS assets come from frontend/.
+app.mount("/", StaticFiles(directory=Path(__file__).parent / "frontend", html=True), name="frontend")
