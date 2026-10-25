@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -58,15 +57,16 @@
         </div>
       </section>
 
+      <!-- Phase 1: Neutral initial metric cards (No fake/hardcoded numbers) -->
       <section class="metrics-grid" aria-label="Performance overview">
         <article class="metric-card">
           <div class="metric-top">
             <span class="metric-label">TOKENS PROCESSED</span>
             <span class="metric-icon blue">⌘</span>
           </div>
-          <div class="metric-value" id="tokensProcessed">12,480</div>
-          <div class="metric-foot"><span class="positive">↗ Streaming</span><span>Session total</span></div>
-          <div class="metric-track"><span class="track-blue" style="width:68%"></span></div>
+          <div class="metric-value" id="tokensProcessed">—</div>
+          <div class="metric-foot"><span class="positive">Awaiting stream</span><span>Session total</span></div>
+          <div class="metric-track"><span class="track-blue" style="width:0%"></span></div>
         </article>
 
         <article class="metric-card">
@@ -74,9 +74,9 @@
             <span class="metric-label">LATENCY / TOKEN</span>
             <span class="metric-icon green">◷</span>
           </div>
-          <div class="metric-value"><span id="latencyValue">402.7</span><small> ms</small></div>
+          <div class="metric-value"><span id="latencyValue">—</span><small></small></div>
           <div class="metric-foot"><span class="positive">Inference telemetry</span><span>Per token</span></div>
-          <div class="metric-track"><span class="track-green" id="latencyTrack" style="width:42%"></span></div>
+          <div class="metric-track"><span class="track-green" id="latencyTrack" style="width:0%"></span></div>
         </article>
 
         <article class="metric-card">
@@ -84,9 +84,9 @@
             <span class="metric-label">VOCABULARY PRUNED</span>
             <span class="metric-icon purple">⌁</span>
           </div>
-          <div class="metric-value"><span id="prunedValue">99.20</span><small>%</small></div>
+          <div class="metric-value"><span id="prunedValue">—</span></div>
           <div class="metric-foot"><span class="positive">Constraint efficiency</span><span>Per decoding step</span></div>
-          <div class="metric-track"><span class="track-purple" id="prunedTrack" style="width:99.2%"></span></div>
+          <div class="metric-track"><span class="track-purple" id="prunedTrack" style="width:0%"></span></div>
         </article>
 
         <article class="metric-card">
@@ -169,7 +169,7 @@
             <h2>Vocabulary masking inspector</h2>
             <p class="section-description">A local view of the token space allowed by the active grammar state.</p>
           </div>
-          <div class="grammar-badge"><span class="status-dot"></span><span id="grammarState">EXPECT_OBJECT_KEY</span></div>
+          <div class="grammar-badge"><span class="status-dot"></span><span id="grammarState">READY</span></div>
         </div>
 
         <div class="inspector-grid">
@@ -180,19 +180,19 @@
             </div>
 
             <div class="vocab-summary">
-              <div><span class="legend-dot allowed-dot"></span><span class="legend-label">Allowed tokens</span><strong id="allowedCount">1,210</strong></div>
-              <div><span class="legend-dot masked-dot"></span><span class="legend-label">Masked tokens</span><strong id="maskedCount">150,433</strong></div>
+              <div><span class="legend-dot allowed-dot"></span><span class="legend-label">Allowed tokens</span><strong id="allowedCount">—</strong></div>
+              <div><span class="legend-dot masked-dot"></span><span class="legend-label">Masked tokens</span><strong id="maskedCount">—</strong></div>
             </div>
 
             <div class="vocab-bar" aria-label="Allowed and masked token distribution">
-              <span class="vocab-allowed" id="allowedBar" style="width:0.8%"></span>
-              <span class="vocab-masked" id="maskedBar" style="width:99.2%"></span>
+              <span class="vocab-allowed" id="allowedBar" style="width:0%"></span>
+              <span class="vocab-masked" id="maskedBar" style="width:0%"></span>
             </div>
             <div class="bar-labels"><span>0</span><span>151,643 tokens</span></div>
 
             <div class="masked-callout">
               <div class="masked-callout-icon">−∞</div>
-              <div><strong id="maskedRatio">99.20% VOCABULARY MASKED</strong><p>Invalid next-token candidates receive a negative-infinity logit.</p></div>
+              <div><strong id="maskedRatio">AWAITING TELEMETRY</strong><p>Invalid next-token candidates receive a negative-infinity logit.</p></div>
             </div>
 
             <div class="allowed-heading"><span>ALLOWED TOKEN SAMPLES</span><span>TOP CANDIDATES</span></div>
@@ -201,7 +201,7 @@
 
           <article class="panel trie-panel">
             <div class="panel-heading">
-              <div><span class="panel-title">PREFIX TRIE</span><span class="panel-subtitle">Localized active subtree</span></div>
+              <div><span class="panel-title">PREFIX TRIE</span><span class="panel-subtitle">Localized active subtree (Illustrative)</span></div>
               <span class="mini-tag green-tag"><span class="status-dot"></span> 3D VIEW</span>
             </div>
             <div class="trie-canvas-wrap" id="trieCanvas">

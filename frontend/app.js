@@ -1,4 +1,3 @@
-
 "use strict";
 
 // ICE Engine frontend connected to the FastAPI SSE stream.
@@ -139,7 +138,7 @@ async function runDemonstration() {
         elements.allowedBar.style.width = `${(valid / size * 100).toFixed(2)}%`;
         elements.maskedBar.style.width = `${(masked / size * 100).toFixed(2)}%`;
         setMetric("maskedRatio", `${(ratio * 100).toFixed(2)}% VOCABULARY MASKED`);
-        setMetric("prunedValue", (ratio * 100).toFixed(2));
+        setMetric("prunedValue", `${(ratio * 100).toFixed(2)}%`);
         elements.prunedTrack.style.width = `${(ratio * 100).toFixed(2)}%`;
         const latency = Number(telemetry.ms_per_token) || 0;
         setMetric("latencyValue", latency.toFixed(1));
@@ -188,18 +187,19 @@ async function runDemonstration() {
     if (activeRequest === controller) {
       activeRequest = null;
       elements.run.disabled = false;
-      elements.run.innerHTML = "Run again";
+      elements.run.innerHTML = "Run inference";
     }
   }
 }
 
+// Phase 1: Fully cleaned reset restoring neutral dash states
 function resetDashboard() {
   stopDemo();
-  setMetric("tokensProcessed", "0");
-  setMetric("latencyValue", "--");
-  setMetric("prunedValue", "--");
-  elements.allowed.textContent = "--";
-  elements.masked.textContent = "--";
+  setMetric("tokensProcessed", "—");
+  setMetric("latencyValue", "—");
+  setMetric("prunedValue", "—");
+  elements.allowed.textContent = "—";
+  elements.masked.textContent = "—";
   elements.allowedBar.style.width = "0%";
   elements.maskedBar.style.width = "0%";
   elements.prunedTrack.style.width = "0%";
@@ -276,7 +276,6 @@ function initTrie() {
     [4, 9], [4, 10]
   ];
 
-  // 11 nodes + 10 branches = 21 objects in this graph.
   const nodeGeometry = new THREE.SphereGeometry(0.085, 12, 12);
   const rootGeometry = new THREE.SphereGeometry(0.15, 16, 16);
 

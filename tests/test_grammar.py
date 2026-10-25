@@ -17,8 +17,25 @@ def test_key_quote_transition():
 
 
 def test_key_name_transition():
-    state = State(GrammarState.EXPECT_KEY_NAME)
+    from src.schema.parser import compile_schema_to_state
+    from src.schema.grammar import transition
+    from src.schema.states import GrammarState
+
+    schema = {
+        "type": "object",
+        "properties": {
+            "age": {"type": "number"},
+        },
+        "required": ["age"],
+        "additionalProperties": False,
+    }
+
+    state = compile_schema_to_state(schema)
+
+    state = transition(state, "{")
+    state = transition(state, '"')
     result = transition(state, "a")
+
     assert result.grammar_state == GrammarState.EXPECT_KEY_NAME
     assert result.buffer == "a"
 

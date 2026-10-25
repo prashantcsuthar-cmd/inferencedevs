@@ -59,6 +59,7 @@ def _close_object(state: State) -> State:
         return _dead(state)
 
     context = state.object_stack[-1]
+
     if not _check_required_keys_present(context):
         return _dead(state)
 
@@ -99,6 +100,7 @@ def transition(state: State, char: str) -> State:
         if current == GrammarState.READING_NUM:
             if not _is_number_complete(state.buffer):
                 return _dead(state)
+
             return _finish_value(state)
 
         # Whitespace is ignored outside strings and keys.
@@ -114,11 +116,15 @@ def transition(state: State, char: str) -> State:
             return state
 
     # 1. Root object start.
-    if current in (GrammarState.START, GrammarState.EXPECT_OBJECT_START):
+    if current in (
+        GrammarState.START,
+        GrammarState.EXPECT_OBJECT_START,
+    ):
         if char != "{":
             return _dead(state)
 
         root_schema = state.schema_root or SchemaNode(type="object")
+
         if root_schema.type not in (None, "object"):
             return _dead(state)
 
@@ -161,21 +167,26 @@ def transition(state: State, char: str) -> State:
 
     # 3. Key characters.
     if current == GrammarState.EXPECT_KEY_NAME:
+        if not state.object_stack:
+            return _dead(state)
+
+        context = state.object_stack[-1]
+        schema = context.schema
+
         if char == '"':
             key = state.buffer
 
-            if not state.object_stack:
-                # Schema-free compatibility mode still requires an object.
-                return _dead(state)
-
-            context = state.object_stack[-1]
-            schema = context.schema
-
+            # Reject duplicate keys.
             if key in context.seen_keys:
                 return _dead(state)
 
             property_schema = schema.get_property(key)
-            if property_schema is None and not schema.additional_properties:
+
+            # Reject undeclared keys when additional properties are disabled.
+            if (
+                property_schema is None
+                and not schema.additional_properties
+            ):
                 return _dead(state)
 
             updated_context = ObjectContext(
@@ -190,22 +201,35 @@ def transition(state: State, char: str) -> State:
                 expected_keys=state.expected_keys,
                 schema_root=state.schema_root,
                 object_stack=_replace_top(
-                    state.object_stack, updated_context
+                    state.object_stack,
+                    updated_context,
                 ),
                 value_schema=property_schema,
                 nesting_depth=state.nesting_depth,
             )
 
-        if ord(char) < 0x20:
+        # JSON property names cannot contain unescaped control characters.
+        # Escaped property names are deliberately unsupported here.
+        if ord(char) < 0x20 or char == "\\":
             return _dead(state)
 
-        # Note: escaped property names are not decoded in this implementation.
-        if char == "\\":
-            return _dead(state)
+        candidate = state.buffer + char
+
+        # When additionalProperties is false, reject any prefix that
+        # cannot become a declared property that has not already been used.
+        if not schema.additional_properties:
+            possible = any(
+                key.startswith(candidate)
+                and key not in context.seen_keys
+                for key, _ in schema.properties
+            )
+
+            if not possible:
+                return _dead(state)
 
         return State(
             GrammarState.EXPECT_KEY_NAME,
-            buffer=state.buffer + char,
+            buffer=candidate,
             expected_keys=state.expected_keys,
             schema_root=state.schema_root,
             object_stack=state.object_stack,
@@ -284,6 +308,7 @@ def transition(state: State, char: str) -> State:
                 return _dead(state)
 
             literal = "true" if char == "t" else "false"
+
             return State(
                 GrammarState.READING_LITERAL,
                 buffer=char,
@@ -414,7 +439,7 @@ def transition(state: State, char: str) -> State:
         if char in "0123456789.eE+-":
             candidate = state.buffer + char
 
-            # Reject impossible prefixes early, while allowing valid
+            # Reject impossible prefixes early while allowing valid
             # incomplete prefixes such as '-', '1.', and '1e+'.
             if not re.fullmatch(
                 r"-?(?:0|[1-9][0-9]*)(?:\.[0-9]*)?(?:[eE][+-]?[0-9]*)?",
@@ -436,8 +461,8 @@ def transition(state: State, char: str) -> State:
         if not _is_number_complete(state.buffer):
             return _dead(state)
 
-        # A delimiter terminates the number. Process that delimiter
-        # using the ordinary completed-value state.
+        # A delimiter terminates the number. Process it using the
+        # ordinary completed-value state.
         completed = _finish_value(state)
         return transition(completed, char)
 
@@ -487,12 +512,12 @@ def delta_star(initial_state: State, text: str) -> State:
 
     for char in text:
         state = transition(state, char)
+
         if state.grammar_state == GrammarState.DEAD_END:
             return state
 
-    # Incomplete numbers are only valid prefixes if they can still
-    # become a valid JSON number; an unfinished number cannot be accepted
-    # as a complete JSON value.
+    # Incomplete numbers are valid prefixes only if they can still
+    # become a valid JSON number. An unfinished number is not complete.
     if (
         state.grammar_state == GrammarState.READING_NUM
         and not re.fullmatch(

@@ -26,7 +26,7 @@ class ICEDecodingEngine:
             if compatibility_engine is not None
             else CompatibilityEngine(tokenizer)
         )
-        self.processor = ICELogitsProcessor(self.compatibility_engine)
+        # Do not keep mutable per-generation state on the shared engine.
 
     def generate(
         self,
@@ -54,9 +54,9 @@ class ICEDecodingEngine:
 
         generated_ids: list[int] = []
 
-        vocabulary_size = outputs_vocab_size = getattr(
-            self.tokenizer, "vocab_size", len(self.tokenizer)
-        )
+        processor = ICELogitsProcessor(self.compatibility_engine)
+        vocabulary_size = int(getattr(self.model.config, "vocab_size", len(self.tokenizer)))
+        outputs_vocab_size = vocabulary_size
 
         valid_token_counts: list[int] = []
         masked_token_counts: list[int] = []
@@ -73,7 +73,7 @@ class ICEDecodingEngine:
             past_key_values = getattr(outputs, "past_key_values", None)
 
             for _ in range(max_new_tokens):
-                self.processor.set_state(state)
+                processor.set_state(state)
 
                 # Compute admissible tokens for telemetry.
                 valid_token_ids = self.compatibility_engine.get_valid_tokens(
@@ -93,7 +93,7 @@ class ICEDecodingEngine:
 
                 # Keep the Hugging Face-compatible processor signature:
                 # __call__(input_ids, scores).
-                masked_logits = self.processor(
+                masked_logits = processor(
                     input_ids,
                     outputs.logits[:, -1, :],
                 )
