@@ -1,257 +1,613 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <meta name="theme-color" content="#0B0F17" />
-  <title>ICE Engine | Inference Compatibility & Enforcement</title>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#0b0b0b">
+  <meta
+    name="description"
+    content="ICE — an offline-first, grammar-guided constrained decoding engine for local language models."
+  >
 
-  <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+  <title>ICE — Constrained Decoding Lab</title>
 
-  <link rel="stylesheet" href="style.css" />
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link
+    href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Space+Grotesk:wght@400;500;600;700&display=swap"
+    rel="stylesheet"
+  >
 
-  <!-- Animation and 3D visualization libraries -->
-  <script defer src="https://cdn.jsdelivr.net/npm/gsap@3.14.2/dist/gsap.min.js"></script>
-  <script defer src="https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.min.js"></script>
-  <script defer src="app.js"></script>
+  <link rel="stylesheet" href="./style.css">
+
+  <script>
+    // Set a backend origin here only when the frontend is hosted separately.
+    // Example: window.ICE_API_URL = "http://127.0.0.1:8000";
+    window.ICE_API_URL = window.ICE_API_URL || "";
+  </script>
+
+  <script src="./app.js" defer></script>
 </head>
 
 <body>
-  <div class="app-shell">
+  <div class="site-shell">
+
+    <!-- Navigation -->
     <header class="topbar">
-      <a class="brand" href="#" aria-label="ICE Engine home">
-        <div class="brand-mark">ICE<span>.</span></div>
-        <div>
-          <div class="brand-name">ICE Engine</div>
-          <div class="brand-caption">INFERENCE COMPATIBILITY & ENFORCEMENT</div>
-        </div>
+      <a class="wordmark" href="#top" aria-label="ICE home">
+        <span class="wordmark-mark">I<span class="mark-dot">.</span></span>
+        <span class="wordmark-sub">
+          INFERENCE COMPATIBILITY<br>
+          &amp; ENFORCEMENT
+        </span>
       </a>
 
-      <div class="system-status" aria-label="Backend status">
-        <span class="status-dot" id="systemStatusDot"></span>
-        <span>LOCAL INFERENCE</span>
-        <span class="status-divider">/</span>
-        <span class="muted" id="headerDevice">WAITING FOR API</span>
-        <span class="airgapped">MODEL: LOCAL</span>
-      </div>
+      <div class="topbar-right">
+        <span class="edition">ICE / LAB 01</span>
 
-      <div class="header-actions">
-        <span class="demo-label" id="backendBadge"><span class="demo-dot"></span> API CHECKING</span>
-        <button class="icon-button" id="resetButton" title="Reset dashboard" aria-label="Reset dashboard">↻</button>
+        <div class="system-state" role="status" aria-live="polite">
+          <span id="statusDot" class="status-dot"></span>
+          <span id="statusLabel">CHECKING ENGINE</span>
+        </div>
+
+        <button
+          id="refreshStatus"
+          class="icon-button"
+          type="button"
+          aria-label="Refresh backend status"
+          title="Refresh backend status"
+        >↻</button>
       </div>
     </header>
 
-    <main class="dashboard">
-      <section class="page-heading">
-        <div>
-          <div class="eyebrow"><span class="eyebrow-line"></span> CONSTRAINED DECODING / OBSERVABILITY</div>
-          <h1>Inference, <span>under control.</span></h1>
-          <p class="page-description">Watch unconstrained generation meet deterministic, schema-valid decoding.</p>
+    <main id="top">
+
+      <!-- Hero -->
+      <section class="hero section-pad">
+        <div class="hero-kicker">
+          <span class="kicker-line"></span>
+          LOCAL INFERENCE / STRUCTURAL CONTROL
         </div>
 
-        <div class="heading-meta">
-          <span class="live-indicator"></span>
-          <span id="connectionLabel" role="status" aria-live="polite">CHECKING BACKEND</span>
-          <small id="connectionDetail">Connecting to the local inference service</small>
+        <div class="hero-grid">
+          <div class="hero-copy">
+            <h1>
+              Constrain<br>
+              the tokens.<br>
+              <span class="accent-text">Control the<br>output.</span>
+            </h1>
+
+            <p class="hero-lede">
+              ICE is an offline-first constrained-decoding layer for local
+              small language models. It uses grammar-state compatibility to
+              restrict token selection while generation is in progress.
+            </p>
+
+            <div class="hero-actions">
+              <a class="button button-acid" href="#workbench">
+                Run a comparison <span>↘</span>
+              </a>
+
+              <a class="text-link" href="#mechanism">
+                Explore the mechanism <span>→</span>
+              </a>
+            </div>
+
+            <div class="hero-footnote" style="margin-top: 30px; color: #aaa99f; font: 10px/1.8 var(--mono);">
+              <span style="color: var(--acid);">✓</span>
+              Local model inference · Grammar-guided token masking · Runtime validation
+            </div>
+          </div>
+
+          <!-- Conceptual illustration: not live backend data -->
+          <div class="hero-visual">
+            <div class="visual-topline">
+              <span>DECODING TRACE</span>
+              <span>ILLUSTRATIVE VIEW</span>
+            </div>
+
+            <div class="token-label">GRAMMAR-GUIDED GENERATION</div>
+
+            <div style="font-size: clamp(27px, 4vw, 43px); font-weight: 700; line-height: 1.02; letter-spacing: -0.065em;">
+              Valid structure.<br>
+              At every step.
+            </div>
+
+            <div class="token-label" style="margin-top: 26px;">
+              JSON OBJECT / TOKEN FLOW
+            </div>
+
+            <div class="token-grid" aria-label="Illustrative token compatibility">
+              <span class="token accepted">{</span>
+              <span class="token accepted">"id"</span>
+              <span class="token">:</span>
+              <span class="token accepted">"A-42"</span>
+              <span class="token">,</span>
+              <span class="token accepted">"paid"</span>
+              <span class="token">:</span>
+              <span class="token accepted">true</span>
+              <span class="token accepted">}</span>
+            </div>
+
+            <div class="constraint-rule">
+              <span class="rule-icon">✓</span>
+              <span>GRAMMAR-COMPATIBLE TOKENS</span>
+              <span class="rule-pass">ALLOW</span>
+            </div>
+
+            <div class="constraint-rule" style="margin-top: 7px;">
+              <span class="rule-icon" style="background: var(--cream);">×</span>
+              <span>INCOMPATIBLE TOKENS</span>
+              <span class="rule-pass" style="color: var(--cream);">MASK</span>
+            </div>
+
+            <div class="visual-footer">
+              <span>SCHEMATIC EXAMPLE</span>
+              <span>NOT LIVE TELEMETRY</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="hero-bottomline">
+          <span>01 / TOKEN COMPATIBILITY</span>
+          <span>02 / LOGITS MASKING</span>
+          <span>03 / OUTPUT VALIDATION</span>
+          <span>OFFLINE-FIRST DESIGN</span>
         </div>
       </section>
 
-      <!-- Phase 1: Neutral initial metric cards (No fake/hardcoded numbers) -->
-      <section class="metrics-grid" aria-label="Performance overview">
-        <article class="metric-card">
-          <div class="metric-top">
-            <span class="metric-label">ICE TOKENS</span>
-            <span class="metric-icon blue">#</span>
-          </div>
-          <div class="metric-value" id="tokensProcessed">—</div>
-          <div class="metric-foot"><span class="positive">Awaiting stream</span><span>Constrained output</span></div>
-          <div class="metric-track"><span class="track-blue" id="tokensTrack" style="width:0%"></span></div>
-        </article>
+      <!-- Mechanism -->
+      <section id="mechanism" class="mechanism section-pad">
+        <div class="eyebrow">THE MECHANISM / 01</div>
 
-        <article class="metric-card">
-          <div class="metric-top">
-            <span class="metric-label">LATENCY / TOKEN</span>
-            <span class="metric-icon green">◷</span>
-          </div>
-          <div class="metric-value"><span id="latencyValue">—</span><small>ms</small></div>
-          <div class="metric-foot"><span class="positive">Inference telemetry</span><span>Per token</span></div>
-          <div class="metric-track"><span class="track-green" id="latencyTrack" style="width:0%"></span></div>
-        </article>
+        <h2>
+          Structural control<br>
+          <span class="muted-text">during generation.</span>
+        </h2>
 
-        <article class="metric-card">
-          <div class="metric-top">
-            <span class="metric-label">VOCABULARY PRUNED</span>
-            <span class="metric-icon purple">%</span>
-          </div>
-          <div class="metric-value"><span id="prunedValue">—</span></div>
-          <div class="metric-foot"><span class="positive">Constraint efficiency</span><span>Per decoding step</span></div>
-          <div class="metric-track"><span class="track-purple" id="prunedTrack" style="width:0%"></span></div>
-        </article>
+        <div class="mechanism-intro">
+          <p>
+            Instead of relying only on instructions or retrying invalid output,
+            constrained decoding limits the token choices available at each
+            generation step according to the supported grammar state.
+          </p>
 
-        <article class="metric-card">
-          <div class="metric-top">
-            <span class="metric-label">SCHEMA VALIDATION</span>
-            <span class="metric-icon green" id="validationIcon">…</span>
-          </div>
-          <div class="metric-value" id="validationValue">—</div>
-          <div class="metric-foot"><span id="validationHint">Awaiting a completed run</span><span>ICE output</span></div>
-          <div class="metric-track"><span class="track-green" id="validationTrack" style="width:0%"></span></div>
-        </article>
+          <p class="micro-note">
+            THE CORE IDEA<br>
+            Restrict token selection before the next token is chosen.
+          </p>
+        </div>
+
+        <div class="pipeline">
+          <article class="pipeline-step">
+            <span class="step-index">01</span>
+            <div class="step-symbol">⌘</div>
+            <h3>TRACK GRAMMAR STATE</h3>
+            <p>
+              Maintain parser state as generated text advances through the
+              supported structured-output grammar.
+            </p>
+          </article>
+
+          <div class="pipeline-arrow" aria-hidden="true">→</div>
+
+          <article class="pipeline-step">
+            <span class="step-index">02</span>
+            <div class="step-symbol">⌁</div>
+            <h3>FILTER TOKEN CHOICES</h3>
+            <p>
+              Use token-prefix compatibility to identify which vocabulary
+              tokens remain legal from the current state.
+            </p>
+          </article>
+
+          <div class="pipeline-arrow" aria-hidden="true">→</div>
+
+          <article class="pipeline-step">
+            <span class="step-index">03</span>
+            <div class="step-symbol">◈</div>
+            <h3>MASK MODEL LOGITS</h3>
+            <p>
+              Apply the compatibility mask before token selection, then
+              validate the completed output.
+            </p>
+          </article>
+        </div>
+
+        <div class="equation-strip">
+          <span class="equation-label">LOGITS TRANSFORMATION</span>
+          <code>z′ = z + M(S, V)</code>
+          <span class="equation-note">0 = ALLOW &nbsp; / &nbsp; −∞ = MASK</span>
+        </div>
       </section>
 
-      <section class="section-block">
-        <div class="section-heading">
+      <!-- Live workbench -->
+      <section id="workbench" class="workbench">
+        <div class="workbench-heading">
           <div>
-            <div class="section-kicker">01 / GENERATION PIPELINE</div>
-            <h2>Constraint comparison</h2>
+            <div class="eyebrow">LIVE EXPERIMENT / 02</div>
+            <h2>
+              Constrained vs.<br>
+              <span style="color: #85847a;">unconstrained.</span>
+            </h2>
           </div>
-          <label class="scenario-control">
-            <span>TEST SCENARIO</span>
-            <select id="scenarioSelect">
-              <option value="drone">Drone survey</option>
-              <option value="finance">Financial transaction</option>
-              <option value="api">API tool call</option>
-            </select>
-          </label>
+
+          <div class="workbench-heading-note">
+            <span class="live-square"></span>
+            <p>
+              Run both generation paths against the same prompt and schema.
+              Inspect generated text, token telemetry, and final validation.
+            </p>
+          </div>
         </div>
 
+        <!-- Configuration -->
+        <section class="control-panel" aria-label="Experiment configuration">
+          <div class="panel-head">
+            <span>EXPERIMENT CONFIGURATION</span>
+            <span class="status-chip">LOCAL REQUEST</span>
+          </div>
+
+          <div class="control-grid">
+            <label class="field">
+              <span>EXAMPLE SCENARIO</span>
+              <select id="scenario">
+                <option value="order">Order extraction</option>
+                <option value="support">Support classification</option>
+                <option value="sensor">Sensor report</option>
+                <option value="custom">Custom schema</option>
+              </select>
+            </label>
+
+            <div class="field field-steps">
+              <label for="maxSteps">MAX TOKEN STEPS</label>
+              <div class="stepper">
+                <button id="stepDown" type="button" aria-label="Decrease token steps">−</button>
+                <input
+                  id="maxSteps"
+                  type="number"
+                  min="1"
+                  max="512"
+                  value="64"
+                  inputmode="numeric"
+                >
+                <button id="stepUp" type="button" aria-label="Increase token steps">+</button>
+              </div>
+            </div>
+          </div>
+
+          <div class="field field-full">
+            <label for="prompt">PROMPT</label>
+            <textarea
+              id="prompt"
+              rows="4"
+              spellcheck="false"
+              placeholder="Describe the structured output you need..."
+            ></textarea>
+          </div>
+
+          <div class="field field-full">
+            <label for="schema">JSON SCHEMA</label>
+            <textarea
+              id="schema"
+              class="schema-editor"
+              rows="10"
+              spellcheck="false"
+              autocapitalize="off"
+              autocomplete="off"
+              placeholder="Enter a JSON Schema object..."
+            ></textarea>
+            <span class="micro-note">
+              SUPPORTED SUBSET ONLY — unsupported schemas may be rejected
+              by the backend grammar implementation.
+            </span>
+          </div>
+
+          <div class="run-row">
+            <div class="run-note">
+              <span class="run-note-mark">i</span>
+              <span>
+                Both paths use the same prompt and schema. Results depend on
+                the model, decoding configuration, and supported grammar.
+              </span>
+            </div>
+
+            <div class="run-actions">
+              <button id="runBtn" class="button button-acid" type="button">
+                ▶ Run comparison
+              </button>
+              <button id="stopBtn" class="button button-outline" type="button" disabled>
+                Stop
+              </button>
+            </div>
+          </div>
+        </section>
+
+        <!-- Execution state -->
+        <section class="telemetry-panel" aria-label="Generation telemetry">
+          <div class="panel-head">
+            <span>GENERATION MONITOR</span>
+            <span id="traceBadge" class="status-chip">IDLE</span>
+          </div>
+
+          <div style="display:flex; justify-content:space-between; flex-wrap:wrap; gap:12px; padding:16px 20px; font:10px var(--mono);">
+            <span>DUAL-PATH EXECUTION</span>
+            <span id="stepCounter">0 steps</span>
+            <span id="elapsedLabel">Waiting for run…</span>
+          </div>
+
+          <div class="telemetry-lower">
+            <div class="telemetry-subpanel">
+              <span class="subpanel-label">ICE ENGINE STATUS</span>
+              <div style="display:flex; align-items:center; gap:10px; font:11px var(--mono);">
+                <span class="status-dot"></span>
+                <span id="iceStatus">IDLE</span>
+              </div>
+            </div>
+
+            <div class="telemetry-subpanel">
+              <span class="subpanel-label">BASELINE STATUS</span>
+              <div style="display:flex; align-items:center; gap:10px; font:11px var(--mono);">
+                <span class="status-dot"></span>
+                <span id="baseStatus">IDLE</span>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- Model outputs -->
         <div class="comparison-grid">
-          <article class="stream-card baseline-card">
-            <div class="stream-header">
-              <div class="stream-title-wrap">
-                <span class="stream-symbol danger-symbol">×</span>
-                <div>
-                  <h3>RAW SLM</h3>
-                  <p>UNCONSTRAINED BASELINE</p>
-                </div>
+          <article class="output-card output-ice">
+            <div class="output-head">
+              <div>
+                <span class="path-index">PATH A / CONSTRAINED</span>
+                <h3>ICE constrained</h3>
               </div>
-              <span class="pill pill-danger"><span class="pill-dot"></span> UNGUARDED</span>
+              <span class="status-chip" id="iceOutputBadge">ICE</span>
             </div>
-            <div class="stream-toolbar"><span>OUTPUT STREAM</span><span id="baselineLineCount">READY</span></div>
-            <pre class="code-stream baseline-output" id="baselineOutput" aria-live="polite"></pre>
-            <div class="stream-footer danger-footer">
-              <span class="footer-status"><span class="status-dot red-dot"></span><span id="baselineStatus">Awaiting baseline output</span></span>
-              <span>UNCONSTRAINED</span>
+
+            <div class="output-meta">
+              <span>GRAMMAR-GUIDED DECODING</span>
+              <span>LIVE OUTPUT</span>
+            </div>
+
+            <pre id="iceOutput" class="code-output" role="log" aria-live="polite" aria-label="ICE generated tokens">Waiting for the first token…</pre>
+
+            <div class="output-foot">
+              <span>GRAMMAR STATE</span>
+              <code id="grammarState">—</code>
             </div>
           </article>
 
-          <article class="stream-card ice-card">
-            <div class="stream-header">
-              <div class="stream-title-wrap">
-                <span class="stream-symbol success-symbol">✓</span>
-                <div>
-                  <h3>ICE-GUIDED</h3>
-                  <p>DETERMINISTIC DECODING</p>
-                </div>
+          <article class="output-card output-baseline">
+            <div class="output-head">
+              <div>
+                <span class="path-index">PATH B / UNCONSTRAINED</span>
+                <h3>Baseline</h3>
               </div>
-              <span class="pill pill-success"><span class="pill-dot"></span> CONSTRAINED</span>
+              <span class="status-chip" id="baseOutputBadge">BASELINE</span>
             </div>
-            <div class="stream-toolbar"><span>VALIDATED OUTPUT STREAM</span><span class="stream-live" id="streamIndicator"><span class="status-dot"></span> AWAITING RUN</span></div>
-            <pre class="code-stream ice-output" id="iceOutput" aria-live="polite"></pre>
-            <div class="stream-footer success-footer">
-              <span class="footer-status"><span class="status-dot"></span><span id="iceStatus">Ready</span></span>
-              <span id="iceValidationTag">SCHEMA CHECK PENDING</span>
+
+            <div class="output-meta">
+              <span>UNCONSTRAINED DECODING</span>
+              <span>LIVE OUTPUT</span>
+            </div>
+
+            <pre id="baseOutput" class="code-output" role="log" aria-live="polite" aria-label="Baseline generated tokens">Waiting for the first token…</pre>
+
+            <div class="output-foot">
+              <span>JSON STATUS</span>
+              <code id="baseJsonState">NOT CHECKED</code>
             </div>
           </article>
         </div>
 
-        <div class="action-row">
-          <div class="action-note"><span class="info-icon">i</span> Runs local ICE and baseline inference through the connected backend.</div>
-          <button class="primary-button" id="runDemoButton"><span aria-hidden="true">▶</span> Run inference</button>
-        </div>
-      </section>
-
-      <section class="section-block inspector-section">
-        <div class="section-heading">
-          <div>
-            <div class="section-kicker">02 / DECODING INTELLIGENCE</div>
-            <h2>Vocabulary masking inspector</h2>
-            <p class="section-description">A local view of the token space allowed by the active grammar state.</p>
+        <!-- Token metrics -->
+        <section class="telemetry-panel" aria-label="ICE token mask telemetry">
+          <div class="panel-head">
+            <span>TOKEN MASK TELEMETRY</span>
+            <span class="status-chip">LATEST RECEIVED ICE STEP</span>
           </div>
-          <div class="grammar-badge"><span class="status-dot"></span><span id="grammarState">READY</span></div>
-        </div>
 
-        <div class="inspector-grid">
-          <article class="panel vocab-panel">
-            <div class="panel-heading">
-              <div><span class="panel-title">VOCABULARY MATRIX</span><span class="panel-subtitle">Token eligibility at current step</span></div>
-              <span class="mini-tag"><span id="vocabularyCapacity">—</span> TOTAL</span>
+          <div class="telemetry-grid">
+            <div class="metric">
+              <span class="metric-label">VOCABULARY</span>
+              <strong id="vocabValue">—</strong>
+              <span class="metric-unit">Total token IDs</span>
             </div>
 
-            <div class="vocab-summary">
-              <div><span class="legend-dot allowed-dot"></span><span class="legend-label">Allowed tokens</span><strong id="allowedCount">—</strong></div>
-              <div><span class="legend-dot masked-dot"></span><span class="legend-label">Masked tokens</span><strong id="maskedCount">—</strong></div>
+            <div class="metric">
+              <span class="metric-label">ALLOWED</span>
+              <strong id="allowedValue">—</strong>
+              <span class="metric-unit">Compatible tokens</span>
             </div>
 
-            <div class="vocab-bar" aria-label="Allowed and masked token distribution">
-              <span class="vocab-allowed" id="allowedBar" style="width:0%"></span>
-              <span class="vocab-masked" id="maskedBar" style="width:0%"></span>
-            </div>
-            <div class="bar-labels"><span>0 allowed</span><span id="vocabularyBarLabel">— tokens</span></div>
-
-            <div class="masked-callout">
-              <div class="masked-callout-icon">−∞</div>
-              <div><strong id="maskedRatio">AWAITING TELEMETRY</strong><p>Invalid next-token candidates receive a negative-infinity logit.</p></div>
+            <div class="metric">
+              <span class="metric-label">MASKED</span>
+              <strong id="maskedValue">—</strong>
+              <span class="metric-unit">Excluded tokens</span>
             </div>
 
-            <div class="allowed-heading"><span>ALLOWED TOKEN SAMPLES</span><span>TOP CANDIDATES</span></div>
-            <div class="token-pills" id="tokenPills"></div>
-          </article>
+            <div class="metric">
+              <span class="metric-label">MASK RATIO</span>
+              <strong id="ratioValue">—</strong>
+              <span class="metric-unit">Masked / vocabulary</span>
+            </div>
 
-          <article class="panel trie-panel">
-            <div class="panel-heading">
-              <div><span class="panel-title">PREFIX TRIE</span><span class="panel-subtitle">Localized active subtree (Illustrative)</span></div>
-              <span class="mini-tag green-tag"><span class="status-dot"></span> 3D VIEW</span>
+            <div class="metric">
+              <span class="metric-label">STEP LATENCY</span>
+              <strong id="latencyValue">—</strong>
+              <span class="metric-unit">Reported ms per token</span>
             </div>
-            <div class="trie-canvas-wrap" id="trieCanvas">
-              <div class="trie-overlay trie-overlay-top"><span>ACTIVE PATH</span><span>LOCAL SUBTREE</span></div>
-              <div class="trie-loading" id="trieFallback">Initializing trie visualization…</div>
-              <div class="trie-overlay trie-overlay-bottom"><span>DRAG TO ROTATE</span><span>SCENE LIMIT: 50 OBJECTS</span></div>
-            </div>
-            <div class="trie-legend">
-              <span><i class="legend-node root-node"></i> Active root</span>
-              <span><i class="legend-node path-node"></i> Prefix path</span>
-              <span><i class="legend-node branch-node"></i> Allowed branches</span>
-            </div>
-          </article>
-        </div>
-      </section>
-
-      <section class="section-block resource-section">
-        <div class="section-heading">
-          <div>
-            <div class="section-kicker">03 / BACKEND DETAILS</div>
-            <h2>Inference service</h2>
           </div>
-          <span class="mini-tag">LIVE STATUS</span>
-        </div>
 
-        <div class="resource-grid">
-          <article class="resource-card">
-            <div class="resource-icon blue">◈</div>
-            <div class="resource-content"><span>ENGINE</span><strong id="engineValue">ICE</strong><p>Constrained decoding service</p></div>
-            <div class="resource-side" id="engineState"><span class="resource-dot blue-dot"></span> WAITING</div>
-          </article>
-          <article class="resource-card">
-            <div class="resource-icon green">⌁</div>
-            <div class="resource-content"><span>INFERENCE DEVICE</span><strong id="deviceValue">—</strong><p>Reported by the backend</p></div>
-            <div class="resource-side" id="deviceState"><span class="resource-dot"></span> LOCAL</div>
-          </article>
-          <article class="resource-card">
-            <div class="resource-icon purple">#</div>
-            <div class="resource-content"><span>VOCABULARY CAPACITY</span><strong id="serviceVocabulary">—</strong><p>Tokenizer vocabulary size</p></div>
-            <div class="resource-side" id="vocabularyState"><span class="resource-dot"></span> TOKEN IDs</div>
-          </article>
-        </div>
+          <div style="padding:0 20px 10px;">
+            <div class="meter" aria-hidden="true">
+              <span id="maskBarFill"></span>
+            </div>
+          </div>
+
+          <div style="display:flex; justify-content:space-between; gap:10px; padding:0 20px 18px; color:#69685f; font:9px var(--mono);">
+            <span>0% MASKED</span>
+            <span>MASKING RATIO</span>
+            <span>100% MASKED</span>
+          </div>
+
+          <div class="telemetry-lower">
+            <div class="telemetry-subpanel">
+              <span class="subpanel-label">SAMPLE ALLOWED TOKENS / FROM BACKEND EVENT</span>
+              <div id="allowedTokens" class="token-samples">
+                <span class="placeholder">Waiting for compatible token sample…</span>
+              </div>
+            </div>
+
+            <div class="telemetry-subpanel">
+              <span class="subpanel-label">LATEST GENERATION EVENT</span>
+              <p class="placeholder" style="margin:0;">
+                Metrics update when telemetry is received from the backend.
+              </p>
+            </div>
+          </div>
+        </section>
+
+        <div id="errorBanner" class="error-banner" role="alert" hidden></div>
+
+        <!-- Final validation -->
+        <section id="resultsSection" class="results-section" hidden>
+          <div class="results-heading">
+            <div>
+              <div class="eyebrow">VALIDATION REPORT / 03</div>
+              <h3>Final output assessment</h3>
+            </div>
+            <p class="micro-note">
+              Based on the validation fields returned by the backend,
+              not visual inspection of the output.
+            </p>
+          </div>
+
+          <div class="results-grid">
+            <article class="result-card">
+              <div class="result-card-head">
+                <span>PATH A / ICE</span>
+                <span id="iceResultStatus" class="status-chip">UNKNOWN</span>
+              </div>
+
+              <div id="iceChecks" class="checks-list"></div>
+
+              <pre id="iceFinalText" class="final-text">(No final output)</pre>
+
+              <div id="iceResultError" class="result-error" style="padding:0 17px 16px; font:10px/1.6 var(--mono);"></div>
+            </article>
+
+            <article class="result-card">
+              <div class="result-card-head">
+                <span>PATH B / BASELINE</span>
+                <span id="baseResultStatus" class="status-chip">UNKNOWN</span>
+              </div>
+
+              <div id="baseChecks" class="checks-list"></div>
+
+              <pre id="baseFinalText" class="final-text">(No final output)</pre>
+
+              <div id="baseResultError" class="result-error" style="padding:0 17px 16px; font:10px/1.6 var(--mono);"></div>
+            </article>
+          </div>
+        </section>
       </section>
 
-      <footer class="footer">
-        <div><span class="footer-brand">ICE<span>.</span></span> Inference Compatibility & Enforcement Engine</div>
-        <div>LOCAL-FIRST ARCHITECTURE <span class="footer-separator">/</span> <span id="footerStatus">DEMO MODE</span></div>
-      </footer>
+      <!-- Architecture -->
+      <section id="architecture" class="architecture section-pad">
+        <div class="eyebrow">SYSTEM DESIGN / 04</div>
+
+        <h2>
+          From schema<br>
+          <span class="muted-text">to token selection.</span>
+        </h2>
+
+        <p class="architecture-intro">
+          ICE sits in the decoding path. It does not replace the language model:
+          it constrains which tokens can be selected at each step according to
+          the supported grammar.
+        </p>
+
+        <div class="eyebrow">CORE DECODING LOOP</div>
+
+        <h3 style="font-size:clamp(24px,4vw,38px); letter-spacing:-.06em; margin-bottom:18px;">
+          Compatibility becomes a <span class="accent-text">logits mask.</span>
+        </h3>
+
+        <p style="max-width:650px; color:#aaa99f; font-size:14px; line-height:1.7;">
+          Let the model produce logits <code>z</code>. ICE constructs a mask
+          from the current grammar state: compatible tokens receive zero,
+          while incompatible tokens receive negative infinity.
+        </p>
+
+        <div class="equation-strip" style="margin:25px 0;">
+          <span class="equation-label">MASKED LOGITS</span>
+          <code>z′ = z + M(S, V)</code>
+          <span class="equation-note">ALLOW / SUPPRESS</span>
+        </div>
+
+        <div id="stateDiagram" class="architecture-diagram" role="img" aria-label="Conceptual flow from schema through grammar state and logits mask to token selection and output validation">
+          <div class="diagram-node">
+            <span>INPUT</span>
+            <b>SCHEMA</b>
+            <small>Define structure</small>
+          </div>
+
+          <div class="diagram-connector" aria-hidden="true">→</div>
+
+          <div class="diagram-node diagram-highlight">
+            <span>STATE</span>
+            <b>GRAMMAR</b>
+            <small>Track legal prefixes</small>
+          </div>
+
+          <div class="diagram-connector" aria-hidden="true">→</div>
+
+          <div class="diagram-node">
+            <span>LOGITS</span>
+            <b>MASK</b>
+            <small>Restrict selection</small>
+          </div>
+
+          <div class="diagram-connector" aria-hidden="true">→</div>
+
+          <div class="diagram-node">
+            <span>OUTPUT</span>
+            <b>CHECK</b>
+            <small>Validate completion</small>
+          </div>
+        </div>
+
+        <div class="architecture-foot">
+          <span>IMPLEMENTATION SCOPE MATTERS</span>
+          <span>
+            Guarantees depend on the implemented grammar and tokenizer
+            compatibility assumptions. Final validation remains important.
+          </span>
+        </div>
+      </section>
     </main>
+
+    <!-- Footer -->
+    <footer class="footer">
+      <div class="footer-brand">ICE<span>.</span></div>
+
+      <p>
+        CONSTRAINED DECODING FOR LOCAL SLMS<br>
+        <span>An engineering prototype exploring structured-output reliability.</span>
+      </p>
+
+      <div class="footer-status">
+        <span id="footerStatusDot" class="status-dot"></span>
+        <span id="footerStatusLabel">CHECKING</span>
+      </div>
+
+      <a class="back-top" href="#top">BACK TO TOP ↑</a>
+    </footer>
+
+    <div id="toast" class="toast" role="status" aria-live="polite"></div>
   </div>
 </body>
 </html>
