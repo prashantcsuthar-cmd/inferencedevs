@@ -39,6 +39,7 @@ app.add_middleware(
 )
 
 MODEL = TOKENIZER = ENGINE = None
+MODEL_ERROR: str | None = None
 
 
 # ---------------------------------------------------------------------------
@@ -47,18 +48,18 @@ MODEL = TOKENIZER = ENGINE = None
 
 @app.on_event("startup")
 def startup_event():
-    global MODEL, TOKENIZER, ENGINE
+    global MODEL, TOKENIZER, ENGINE, MODEL_ERROR
 
-    MODEL, TOKENIZER = load_qwen()
-    ENGINE = ICEDecodingEngine(
-        model=MODEL,
-        tokenizer=TOKENIZER,
-    )
-
-    print(
-        "ICE local inference engine initialized.",
-        flush=True,
-    )
+    try:
+        MODEL, TOKENIZER = load_qwen()
+        ENGINE = ICEDecodingEngine(model=MODEL, tokenizer=TOKENIZER)
+        MODEL_ERROR = None
+        print("ICE local inference engine initialized.", flush=True)
+    except Exception as exc:
+        # Keep the API and static frontend available so /status can explain
+        # missing model files or an invalid model configuration.
+        MODEL_ERROR = f"{type(exc).__name__}: {exc}"
+        print(f"ICE model initialization failed: {MODEL_ERROR}", flush=True)
 
 
 # ---------------------------------------------------------------------------
@@ -69,10 +70,11 @@ def startup_event():
 def get_status():
     if MODEL is None or TOKENIZER is None or ENGINE is None:
         return {
-            "status": "STARTING",
+            "status": "ERROR" if MODEL_ERROR else "STARTING",
             "device": "unknown",
             "engine": "ICE",
             "vocabulary_capacity": 0,
+            "error": MODEL_ERROR,
         }
 
     return {
@@ -227,7 +229,6 @@ async def stream_generation(
     if schema_dict is None:
         # Without a schema, use the existing generic grammar state.
         initial_state = State(GrammarState.START)
-        schema_root = None
 
     else:
         try:
@@ -239,7 +240,6 @@ async def stream_generation(
                 detail=f"Invalid or unsupported schema: {exc}",
             ) from exc
 
-        schema_root = initial_state.schema_root
 
     async def event_generator():
         if ENGINE is None or MODEL is None or TOKENIZER is None:

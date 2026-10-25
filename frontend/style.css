@@ -127,6 +127,12 @@ button:focus-visible, select:focus-visible {
 }
 
 .demo-dot { background: #fbbf24; box-shadow: 0 0 8px #fbbf2444; }
+.demo-label.is-online { color: #6ee7b7; }
+.demo-label.is-online .demo-dot { background: var(--green); box-shadow: 0 0 8px #10b98166; }
+.demo-label.is-offline { color: #f87171; }
+.demo-label.is-offline .demo-dot { background: var(--red); box-shadow: 0 0 8px #ef444466; }
+.status-dot.is-offline { background: var(--red); box-shadow: 0 0 8px #ef444466; }
+.status-dot.is-starting { background: #fbbf24; box-shadow: 0 0 8px #fbbf2466; }
 
 .icon-button {
   width: 34px;
@@ -179,15 +185,26 @@ h1 span { color: #7186a7; }
 
 .heading-meta {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 9px;
   color: #8492a8;
   font: 9px var(--mono);
   white-space: nowrap;
   padding-bottom: 5px;
+  max-width: min(45%, 420px);
+  justify-content: flex-end;
 }
 
 .live-indicator { width: 6px; height: 6px; }
+.heading-meta small {
+  flex-basis: 100%;
+  color: var(--muted);
+  font: 9px/1.5 var(--sans);
+  white-space: normal;
+  text-align: right;
+  overflow-wrap: anywhere;
+}
 
 .metrics-grid {
   display: grid;
@@ -223,6 +240,7 @@ h1 span { color: #7186a7; }
 
 .metric-icon.green, .resource-icon.green { background: #10b98112; color: var(--green); }
 .metric-icon.purple, .resource-icon.purple { background: #a78bfa12; color: var(--purple); }
+.metric-icon.is-fail { background: #ef444414; color: var(--red); }
 
 .metric-value {
   font: 500 clamp(23px, 2.2vw, 30px) var(--mono);
@@ -249,6 +267,14 @@ h1 span { color: #7186a7; }
 .track-blue { background: var(--blue); }
 .track-green { background: var(--green); }
 .track-purple { background: var(--purple); }
+.track-fail { background: var(--red) !important; }
+
+.metric-foot #validationHint {
+  max-width: 70%;
+  white-space: normal;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
 
 .section-block { margin-top: 37px; }
 
@@ -569,6 +595,8 @@ h1 span { color: #7186a7; }
   .page-heading { align-items: flex-start; flex-direction: column; gap: 16px; }
   h1 { font-size: 32px; }
   .heading-meta { padding-bottom: 0; }
+  .heading-meta { max-width: 100%; justify-content: flex-start; }
+  .heading-meta small { text-align: left; }
   .metrics-grid { gap: 10px; }
   .metric-card { padding: 14px; }
   .metric-label { font-size: 8px; }
