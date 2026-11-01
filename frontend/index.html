@@ -1,6 +1,7 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
 <head>
+<<<<<<< Updated upstream
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#0b0b0b">
@@ -27,9 +28,21 @@
   </script>
 
   <script src="./app.js" defer></script>
+=======
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="theme-color" content="#090b12" />
+  <meta name="description" content="ICE is a local-first constrained decoding layer for structured language model output." />
+  <title>ICE / LAB — Constrained Decoding</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="style.css?v=3" />
+  <script defer src="app.js?v=3"></script>
+>>>>>>> Stashed changes
 </head>
-
 <body>
+<<<<<<< Updated upstream
   <div class="site-shell">
 
     <!-- Navigation -->
@@ -57,9 +70,129 @@
           aria-label="Refresh backend status"
           title="Refresh backend status"
         >↻</button>
-      </div>
-    </header>
+=======
+  <header class="topbar">
+    <a class="brand" href="#home" aria-label="ICE Lab home">
+      <span class="brand-mark">I</span>
+      <span class="brand-copy"><strong>ICE <i>/</i> <b>LAB</b></strong><small>INFERENCE COMPATIBILITY &amp; ENFORCEMENT</small></span>
+    </a>
+    <nav class="main-nav" aria-label="Main navigation">
+      <a href="#mechanism">Mechanism</a>
+      <a href="#workbench">Workbench</a>
+      <a href="#architecture">Architecture</a>
+    </nav>
+    <div class="header-actions">
+      <div class="engine-status" id="backendBadge" role="status" aria-live="polite"><span class="status-dot"></span><span id="backendLabel">CHECKING API</span></div>
+      <button class="icon-button" id="refreshButton" type="button" aria-label="Refresh backend status" title="Refresh status">↻</button>
+      <a class="header-cta" href="#workbench">Open workbench <span aria-hidden="true">↘</span></a>
+    </div>
+    <button class="menu-toggle" id="menuToggle" type="button" aria-label="Toggle navigation" aria-expanded="false"><span></span><span></span></button>
+  </header>
 
+  <main>
+    <section class="hero section-wrap" id="home">
+      <div class="hero-copy">
+        <div class="eyebrow"><span class="pulse-dot"></span> LOCAL INFERENCE · STRUCTURAL CONTROL <i>/</i> ICE ENGINE</div>
+        <h1>Constrain the<br />tokens.<br /><span class="gradient-text">Control the<br class="mobile-break" /> output.</span></h1>
+        <p class="hero-lede">ICE is an offline-first constrained-decoding layer for local small language models. It uses grammar-state compatibility to restrict token selection while generation is in progress.</p>
+        <div class="hero-actions">
+          <a class="button button-primary" href="#workbench">Explore the workbench <span aria-hidden="true">↘</span></a>
+          <a class="text-link" href="#mechanism">How it works <span aria-hidden="true">↓</span></a>
+        </div>
+        <div class="hero-footnote"><span class="tiny-line"></span> LOCAL MODEL · STRUCTURED OUTPUT · LIVE TELEMETRY</div>
+      </div>
+      <div class="hero-visual" aria-label="Illustration of grammar-guided token selection">
+        <div class="visual-topline"><span><i class="pulse-dot"></i> DECODING TRACE</span><span>ILLUSTRATIVE VIEW</span></div>
+        <div class="visual-head">
+          <div><span class="micro-label">GRAMMAR-GUIDED GENERATION</span><h2>Valid structure.<br /><em>At every step.</em></h2></div>
+          <div class="ice-orbit"><span class="orbit orbit-one"></span><span class="orbit orbit-two"></span><span class="orbit-core">ICE</span></div>
+        </div>
+        <div class="token-flow-card">
+          <div class="flow-head"><span>JSON OBJECT / TOKEN FLOW</span><span class="flow-concept">CONCEPT</span></div>
+          <div class="token-flow" aria-hidden="true"><span class="token token-brace">{</span><span class="token token-key">&quot;id&quot;</span><span class="token token-punct">:</span><span class="token token-value">&quot;A-42&quot;</span><span class="token token-punct">,</span><span class="token token-key">&quot;paid&quot;</span><span class="token token-punct">:</span><span class="token token-bool">true</span><span class="token token-brace">}</span></div>
+          <div class="flow-rule"><span class="rule-check">✓</span><span><strong>Grammar-compatible tokens</strong><small>Remain eligible for selection</small></span><b>ALLOW</b></div>
+          <div class="flow-rule muted-rule"><span class="rule-cross">×</span><span><strong>Invalid next-token candidates</strong><small>Removed from the selection space</small></span><b>MASK</b></div>
+        </div>
+        <div class="visual-foot"><span>STRUCTURE IS ENFORCED DURING GENERATION</span><span class="visual-bars"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></span></div>
+      </div>
+      <div class="hero-glow" aria-hidden="true"></div>
+    </section>
+
+    <section class="mechanism section-wrap" id="mechanism">
+      <div class="section-intro">
+        <div><div class="section-kicker">01 / THE MECHANISM</div><h2>Structure guides every choice.</h2></div>
+        <p>At each decoding step, ICE checks which token IDs can continue a valid output under the active grammar state.</p>
+      </div>
+      <div class="mechanism-grid">
+        <article class="mechanism-card"><span class="step-number">01</span><div class="step-icon icon-schema">{ }</div><h3>Define the shape</h3><p>Provide a JSON schema and a prompt for the local model to complete.</p><div class="step-line"><span></span></div></article>
+        <article class="mechanism-card"><span class="step-number">02</span><div class="step-icon icon-filter">⌁</div><h3>Filter each step</h3><p>Grammar compatibility keeps valid next tokens available to the decoder.</p><div class="step-line"><span></span></div></article>
+        <article class="mechanism-card"><span class="step-number">03</span><div class="step-icon icon-check">✓</div><h3>Validate the result</h3><p>Compare constrained and baseline generation with a final JSON and schema report.</p><div class="step-line"><span></span></div></article>
+      </div>
+    </section>
+
+    <section class="workbench section-wrap" id="workbench">
+      <div class="section-intro workbench-intro">
+        <div><div class="section-kicker">02 / LIVE WORKBENCH</div><h2>See the constraint in motion.</h2></div>
+        <div class="workbench-meta"><span class="pulse-dot" id="connectionDot"></span><span id="connectionLabel" role="status" aria-live="polite">Checking local inference engine</span><small id="connectionDetail">Connecting to the API</small></div>
+      </div>
+
+      <div class="workbench-grid">
+        <aside class="setup-panel panel">
+          <div class="panel-top"><div><span class="panel-kicker">RUN CONFIGURATION</span><h3>Set up a comparison</h3></div><span class="panel-index">ICE / 01</span></div>
+          <label class="field-label" for="scenarioSelect">START FROM A SCENARIO</label>
+          <select class="field-control scenario-select" id="scenarioSelect">
+            <option value="orders">Order fulfillment</option>
+            <option value="drone">Drone survey</option>
+            <option value="finance">Financial transaction</option>
+            <option value="api">API tool call</option>
+          </select>
+          <label class="field-label" for="promptInput">PROMPT <span>Sent to both runners</span></label>
+          <textarea class="field-control prompt-input" id="promptInput" rows="4" spellcheck="false" aria-label="Inference prompt"></textarea>
+          <div class="schema-label-row"><label class="field-label" for="schemaInput">JSON SCHEMA</label><span class="schema-format">SUPPORTED SUBSET</span></div>
+          <textarea class="field-control schema-input" id="schemaInput" rows="11" spellcheck="false" aria-label="JSON schema"></textarea>
+          <div class="stepper-row"><label class="field-label" for="maxSteps">MAX TOKEN STEPS</label><div class="stepper"><button id="stepDown" type="button" aria-label="Decrease max token steps">−</button><input id="maxSteps" type="number" min="1" max="512" value="64" inputmode="numeric" aria-label="Maximum token steps" /><button id="stepUp" type="button" aria-label="Increase max token steps">+</button></div></div>
+          <div class="run-actions"><button class="button button-run" id="runButton" type="button"><span aria-hidden="true">▶</span> Run comparison</button><button class="button button-stop" id="stopButton" type="button" disabled>Stop</button></div>
+          <p class="schema-note" id="formMessage">The backend supports a JSON Schema subset: type, properties, required, and additionalProperties.</p>
+        </aside>
+
+        <div class="results-column">
+          <section class="telemetry-panel panel" aria-label="Token mask telemetry">
+            <div class="panel-top telemetry-title"><span class="panel-kicker">TOKEN MASK TELEMETRY</span><span class="panel-index" id="latestStep">LATEST RECEIVED ICE STEP —</span></div>
+            <div class="telemetry-grid">
+              <article class="telemetry-cell"><span>Vocabulary</span><strong id="totalVocabulary">—</strong><small>Total token IDs</small></article>
+              <article class="telemetry-cell"><span>Allowed</span><strong id="allowedCount">—</strong><small>Compatible tokens</small></article>
+              <article class="telemetry-cell"><span>Masked</span><strong id="maskedCount">—</strong><small>Excluded tokens</small></article>
+              <article class="telemetry-cell"><span>Mask ratio</span><strong id="maskRatio">—</strong><small>Masked / vocabulary</small></article>
+              <article class="telemetry-cell"><span>Step latency</span><strong id="stepLatency">—</strong><small>Reported ms per token</small></article>
+            </div>
+            <div class="mask-track"><span id="maskTrack"></span></div>
+            <div class="mask-labels"><span>0% MASKED</span><span>MASKING RATIO</span><span>100% MASKED</span></div>
+            <div class="allowed-samples"><div class="sample-heading"><span>SAMPLE ALLOWED TOKENS</span><span>FROM BACKEND EVENT</span></div><div class="token-pills" id="tokenPills"><span class="empty-sample">No token sample supplied for this step.</span></div></div>
+          </section>
+
+          <section class="assessment-section" aria-label="Final output assessment">
+            <div class="assessment-heading"><div><div class="section-kicker">03 / VALIDATION REPORT</div><h3>Final output assessment</h3></div><p>Results use the validation fields returned by the backend, not visual inspection of the stream.</p></div>
+            <div class="assessment-grid">
+              <article class="output-card output-ice">
+                <div class="output-card-head"><div class="output-name"><span class="runner-icon">I</span><strong>ICE constrained</strong></div><span class="result-state" id="iceResultState">AWAITING RUN</span></div>
+                <div class="validation-badges"><span id="iceCompleted" class="validation-badge">Completed: —</span><span id="iceJsonValid" class="validation-badge">JSON valid: —</span><span id="iceSchemaValid" class="validation-badge">Schema valid: —</span></div>
+                <pre class="output-text" id="iceOutput" aria-live="polite">Run a comparison to see the constrained output.</pre>
+                <p class="output-error" id="iceError" hidden></p>
+              </article>
+              <article class="output-card output-baseline">
+                <div class="output-card-head"><div class="output-name"><span class="runner-icon baseline-icon">B</span><strong>Baseline</strong></div><span class="result-state" id="baselineResultState">AWAITING RUN</span></div>
+                <div class="validation-badges"><span id="baselineCompleted" class="validation-badge">Completed: —</span><span id="baselineJsonValid" class="validation-badge">JSON valid: —</span><span id="baselineSchemaValid" class="validation-badge">Schema valid: —</span></div>
+                <pre class="output-text" id="baselineOutput" aria-live="polite">Run a comparison to see the baseline output.</pre>
+                <p class="output-error" id="baselineError" hidden></p>
+              </article>
+            </div>
+          </section>
+        </div>
+>>>>>>> Stashed changes
+      </div>
+    </section>
+
+<<<<<<< Updated upstream
     <main id="top">
 
       <!-- Hero -->
@@ -67,8 +200,23 @@
         <div class="hero-kicker">
           <span class="kicker-line"></span>
           LOCAL INFERENCE / STRUCTURAL CONTROL
+=======
+    <section class="architecture section-wrap" id="architecture">
+      <div class="architecture-panel">
+        <div><div class="section-kicker">04 / LOCAL BY DESIGN</div><h2>Inference stays close.<br /><span>Control stays explicit.</span></h2><p>ICE connects to the local inference service and reports its health, device, vocabulary capacity, and generation results directly from the API.</p><a href="#workbench" class="text-link">Configure a run <span aria-hidden="true">↗</span></a></div>
+        <div class="service-details">
+          <div class="service-heading"><span class="panel-kicker">CONNECTED INFERENCE SERVICE</span><span class="service-state" id="serviceState"><i class="status-dot"></i><span>CHECKING</span></span></div>
+          <div class="service-row"><span>ENGINE</span><strong id="engineValue">ICE</strong></div>
+          <div class="service-row"><span>DEVICE</span><strong id="deviceValue">—</strong></div>
+          <div class="service-row"><span>VOCABULARY CAPACITY</span><strong id="serviceVocabulary">—</strong></div>
+          <div class="service-row"><span>API ENDPOINT</span><strong id="apiEndpoint">LOCAL</strong></div>
+>>>>>>> Stashed changes
         </div>
+      </div>
+    </section>
+  </main>
 
+<<<<<<< Updated upstream
         <div class="hero-grid">
           <div class="hero-copy">
             <h1>
@@ -609,5 +757,8 @@
 
     <div id="toast" class="toast" role="status" aria-live="polite"></div>
   </div>
+=======
+  <footer class="footer section-wrap"><a class="footer-brand" href="#home"><span class="brand-mark small-mark">I</span><span>ICE <i>/</i> LAB</span></a><span>INFERENCE COMPATIBILITY &amp; ENFORCEMENT</span><span>LOCAL-FIRST ARCHITECTURE <i>/</i> <b id="footerStatus">CHECKING API</b></span></footer>
+>>>>>>> Stashed changes
 </body>
 </html>

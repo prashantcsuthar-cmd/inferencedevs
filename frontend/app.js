@@ -6,8 +6,6 @@
 
   // ============================================================
   // EXAMPLE SCENARIOS
-  // Keep these compatible with the current backend grammar.
-  // Supported schema types: boolean, null, number, object, string.
   // ============================================================
 
   const examples = {
@@ -115,8 +113,6 @@
 
   // ============================================================
   // API URL
-  // FastAPI serves the frontend and API on the same origin.
-  // Set window.ICE_API_URL before app.js only if needed.
   // ============================================================
 
   function apiBase() {
@@ -132,6 +128,10 @@
 
     return window.location.origin;
   }
+
+  // ============================================================
+  // HELPERS
+  // ============================================================
 
   function pretty(value) {
     const number = Number(value);
@@ -302,7 +302,6 @@
 
   // ============================================================
   // OUTPUT RENDERING
-  // Treat generated model output as text, never as HTML.
   // ============================================================
 
   function appendToken(which, text) {
@@ -454,10 +453,7 @@
   }
 
   // ============================================================
-  // BASIC CLIENT-SIDE SCHEMA COMPATIBILITY CHECK
-  //
-  // This catches obvious unsupported schema features before
-  // sending a request. The backend remains the authority.
+  // SCHEMA VALIDATION
   // ============================================================
 
   function validateSupportedSchema(schema) {
@@ -480,9 +476,6 @@
         }
       }
 
-      // The current backend's advertised contract does not
-      // establish support for JSON Schema enum constraints.
-      // Warn rather than silently claiming they are enforced.
       if (node.enum != null) {
         errors.push(
           `${path}.enum: enum constraints are not enabled by this frontend's ` +
@@ -980,7 +973,6 @@
         cache: 'no-store'
       });
 
-      // Distinguish a server-side rejection from a network failure.
       if (!response.ok) {
         let detail = `The stream endpoint returned HTTP ${response.status}.`;
 
@@ -1001,11 +993,10 @@
                 : JSON.stringify(body.detail);
           }
         } catch {
-          // The HTTP status remains useful if the body is not JSON.
+          // Keep the HTTP status if the body is not JSON.
         }
 
         const error = new Error(detail);
-
         error.httpStatus = response.status;
 
         throw error;
@@ -1045,7 +1036,6 @@
 
         buffer += decoder.decode(value, { stream: true });
 
-        // A network chunk may contain part of a frame or several frames.
         while (true) {
           const boundaryMatch = /\r?\n\r?\n/.exec(buffer);
 
@@ -1088,8 +1078,6 @@
         );
 
         if (Number.isInteger(error.httpStatus)) {
-          // The server responded: this is an API/request error,
-          // not a connection failure.
           setTrace(
             `HTTP ${error.httpStatus}`,
             'error'
@@ -1304,7 +1292,6 @@
       });
     }
 
-    // Load the default supported scenario.
     if (scenario) {
       scenario.value = 'order';
     }
