@@ -11,7 +11,7 @@ Small Local Language Models (SLMs) running on edge hardware frequently struggle 
 
 **Inferencedevs Constrained Engine (ICE)** eliminates these failures by sitting directly inside the PyTorch generation loop at every single token step. Using a mathematical finite state machine and subword prefix indexing, ICE calculates which vocabulary tokens are structurally legal according to a target JSON schema and applies an additive logit mask ($-\infty$) to block illegal choices. 
 
-**ICE forces small local models (like Qwen2.5-0.5B on CPU) to generate structurally valid outputs within the supported grammar subset, with zero external network dependencies.**
+**ICE is designed to constrain JSON generation within its explicitly supported grammar subset.** Correctness and performance must be verified with the actual model/tokenizer pair and independent output validation. The first model target is Qwen2.5-0.5B-Instruct; this repository should not be treated as production-validated until the compatibility and integration tests pass.
 
 ---
 
@@ -162,3 +162,36 @@ py -m uvicorn main:app --reload --host 127.0.0.1 --port 8000
 ```
 
 Open [http://127.0.0.1:8000](http://127.0.0.1:8000). The first startup loads the configured Qwen model; `/status` reports readiness, and **Run inference** streams ICE and baseline tokens from `/stream`. You can also serve `frontend/` separately; set `window.ICE_API_URL` to the backend origin before `app.js` loads if it is on another host.
+
+
+## Local setup and verification
+
+Use Python 3.11 or 3.12 in a virtual environment where possible, then install dependencies:
+
+```bash
+python -m venv .venv
+# Windows PowerShell:
+.venv\\Scripts\\Activate.ps1
+# macOS/Linux:
+# source .venv/bin/activate
+python -m pip install --upgrade pip
+pip install -r requirements.txt
+pytest -q
+```
+
+Real-model smoke tests are intentionally opt-in because they may download model weights and consume significant memory/time:
+
+```bash
+# PowerShell
+$env:ICE_RUN_MODEL_TESTS = "1"
+pytest -q tests/test_qwen.py tests/test_ice_qwen.py
+```
+
+Configuration:
+- `ICE_MODEL_NAME`: Hugging Face model ID or local model directory (default `Qwen/Qwen2.5-0.5B-Instruct`).
+- `ICE_DEVICE`: `cpu` by default; optionally `cuda` or `auto`.
+- `ICE_LOCAL_FILES_ONLY=1`: require model/tokenizer files to be cached locally.
+
+The chat template is used when the tokenizer provides one. JSON Schema support is intentionally limited; unsupported schema keywords should be rejected rather than assumed to be enforced. Independent validation is still required after generation.
+
+**Important limitation:** the current character-trie/token-fragment compatibility strategy is not a formal guarantee for every tokenizer's context-dependent decoding behavior. Before claiming production-grade correctness, run tokenizer-specific tests against the actual generated token sequences, including Unicode, escaped strings, and boundary cases. Do not present benchmark CSVs as evidence unless the exact benchmark procedure and environment are reproducible.

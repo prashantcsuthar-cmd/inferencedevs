@@ -31,7 +31,7 @@ def _compile_node(schema: Dict[str, Any], path: str = "$", *, root: bool = False
 
     raw_properties = schema.get("properties", {})
     raw_required = schema.get("required", [])
-    additional = schema.get("additionalProperties", False)
+    additional = schema.get("additionalProperties", True)
     if not isinstance(raw_properties, dict) or not all(isinstance(k, str) for k in raw_properties):
         raise ValueError(f"'properties' at {path} must be an object with string keys.")
     if not isinstance(raw_required, list) or not all(isinstance(k, str) for k in raw_required):

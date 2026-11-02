@@ -20,7 +20,7 @@ from fastapi.responses import StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from jsonschema import Draft202012Validator, SchemaError
 
-from src.models.loader import load_qwen
+from src.models.loader import load_qwen, format_chat_prompt
 from src.decoding.engine import ICEDecodingEngine
 from src.schema.states import GrammarState, State
 from src.schema.grammar import transition
@@ -252,8 +252,9 @@ async def stream_generation(
             # ---------------------------------------------------------------
             # Tokenize the prompt and initialize independent generation paths.
             # ---------------------------------------------------------------
+            formatted_prompt = format_chat_prompt(TOKENIZER, prompt)
             inputs = TOKENIZER(
-                prompt,
+                formatted_prompt,
                 return_tensors="pt",
             ).to(MODEL.device)
 

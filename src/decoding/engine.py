@@ -12,6 +12,7 @@ from src.decoding.logits_processor import ICELogitsProcessor
 from src.schema.grammar import transition
 from src.schema.parser import compile_schema_to_state
 from src.schema.states import GrammarState, State
+from src.models.loader import format_chat_prompt
 from src.tokenizer.compatibility import CompatibilityEngine
 
 
@@ -37,7 +38,8 @@ class ICEDecodingEngine:
         if max_new_tokens < 1:
             raise ValueError("max_new_tokens must be at least 1.")
 
-        inputs = self.tokenizer(prompt, return_tensors="pt")
+        formatted_prompt = format_chat_prompt(self.tokenizer, prompt)
+        inputs = self.tokenizer(formatted_prompt, return_tensors="pt")
         inputs = {
             key: value.to(self.model.device)
             for key, value in inputs.items()

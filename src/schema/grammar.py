@@ -12,6 +12,10 @@ JSON_NUMBER_PATTERN = re.compile(
     r"-?(?:0|[1-9][0-9]*)(?:\.[0-9]+)?(?:[eE][+-]?[0-9]+)?"
 )
 
+JSON_NUMBER_PREFIX_PATTERN = re.compile(
+    r"-?(?:0|[1-9][0-9]*)(?:\.[0-9]*)?(?:[eE][+-]?[0-9]*)?"
+)
+
 
 def _is_number_complete(num_str: str) -> bool:
     return JSON_NUMBER_PATTERN.fullmatch(num_str) is not None
@@ -95,7 +99,7 @@ def transition(state: State, char: str) -> State:
         # A completed root object cannot be followed by more JSON content.
         return _dead(state)
 
-    # Numbers need whitespace to terminate their token, not disappear into it.
+    # Numbers need a delimiter to terminate their token.
     if char in WHITESPACE:
         if current == GrammarState.READING_NUM:
             if not _is_number_complete(state.buffer):
@@ -131,7 +135,7 @@ def transition(state: State, char: str) -> State:
         return State(
             GrammarState.EXPECT_KEY_QUOTE,
             expected_keys=state.expected_keys,
-            schema_root=state.schema_root,
+            schema_root=root_schema,
             object_stack=(ObjectContext(schema=root_schema),),
             nesting_depth=0,
         )
@@ -152,7 +156,7 @@ def transition(state: State, char: str) -> State:
 
         return _dead(state)
 
-    # A comma requires another key; therefore '}' here is invalid.
+    # A comma requires another key; therefore '}' is invalid here.
     if current == GrammarState.EXPECT_KEY_QUOTE_AFTER_COMMA:
         if char != '"':
             return _dead(state)
@@ -208,15 +212,15 @@ def transition(state: State, char: str) -> State:
                 nesting_depth=state.nesting_depth,
             )
 
-        # JSON property names cannot contain unescaped control characters.
-        # Escaped property names are deliberately unsupported here.
+        # Property names cannot contain unescaped control characters.
+        # Escaped property names are not supported by this implementation.
         if ord(char) < 0x20 or char == "\\":
             return _dead(state)
 
         candidate = state.buffer + char
 
-        # When additionalProperties is false, reject any prefix that
-        # cannot become a declared property that has not already been used.
+        # When additionalProperties is false, every key prefix must be
+        # compatible with an unused declared property.
         if not schema.additional_properties:
             possible = any(
                 key.startswith(candidate)
@@ -439,12 +443,8 @@ def transition(state: State, char: str) -> State:
         if char in "0123456789.eE+-":
             candidate = state.buffer + char
 
-            # Reject impossible prefixes early while allowing valid
-            # incomplete prefixes such as '-', '1.', and '1e+'.
-            if not re.fullmatch(
-                r"-?(?:0|[1-9][0-9]*)(?:\.[0-9]*)?(?:[eE][+-]?[0-9]*)?",
-                candidate,
-            ):
+            # Permit only prefixes that could still become valid numbers.
+            if not JSON_NUMBER_PREFIX_PATTERN.fullmatch(candidate):
                 return _dead(state)
 
             return State(
@@ -461,8 +461,9 @@ def transition(state: State, char: str) -> State:
         if not _is_number_complete(state.buffer):
             return _dead(state)
 
-        # A delimiter terminates the number. Process it using the
-        # ordinary completed-value state.
+        # A delimiter terminates the number. Process it in the completed
+        # value state so commas, closing braces, and whitespace are handled
+        # consistently.
         completed = _finish_value(state)
         return transition(completed, char)
 
@@ -491,6 +492,25 @@ def transition(state: State, char: str) -> State:
     # 10. Comma or object close.
     if current == GrammarState.EXPECT_COMMA_OR_END:
         if char == ",":
+            if not state.object_stack:
+                return _dead(state)
+
+            context = state.object_stack[-1]
+            schema = context.schema
+
+            # If extra properties are prohibited, a comma is only legal
+            # when at least one declared property remains unused.
+            has_unused_declared_property = any(
+                key not in context.seen_keys
+                for key, _ in schema.properties
+            )
+
+            if (
+                not schema.additional_properties
+                and not has_unused_declared_property
+            ):
+                return _dead(state)
+
             return State(
                 GrammarState.EXPECT_KEY_QUOTE_AFTER_COMMA,
                 expected_keys=state.expected_keys,
@@ -516,17 +536,16 @@ def delta_star(initial_state: State, text: str) -> State:
         if state.grammar_state == GrammarState.DEAD_END:
             return state
 
-    # Incomplete numbers are valid prefixes only if they can still
-    # become a valid JSON number. An unfinished number is not complete.
+    # An unfinished number is a viable prefix only if it could still
+    # become a valid JSON number. It is not yet a completed value.
     if (
         state.grammar_state == GrammarState.READING_NUM
-        and not re.fullmatch(
-            r"-?(?:0|[1-9][0-9]*)(?:\.[0-9]*)?(?:[eE][+-]?[0-9]*)?",
-            state.buffer,
-        )
+        and not JSON_NUMBER_PREFIX_PATTERN.fullmatch(state.buffer)
     ):
         return _dead(state)
 
+    # A Unicode escape must contain exactly four hexadecimal digits.
+    # If generation ends during the escape, the string is incomplete.
     if state.grammar_state in {
         GrammarState.READING_UNICODE_1,
         GrammarState.READING_UNICODE_2,
